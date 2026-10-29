@@ -11,13 +11,20 @@ android {
         applicationId = "br.com.mi.atv.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "3.0-tvOS"
+        versionCode = 4
+        versionName = "4.0-Turbo"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Usa a chave debug padrão para não dar conflito ao instalar por cima, mas com otimização máxima Release/R8
+            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {

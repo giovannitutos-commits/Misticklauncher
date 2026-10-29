@@ -12,8 +12,6 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -35,14 +33,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -52,19 +50,24 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
+@Immutable
 data class AppEntry(
     val packageName: String,
     val label: String,
-    val banner: Bitmap?,
-    val icon: Bitmap?
+    val banner: ImageBitmap?,
+    val icon: ImageBitmap?,
+    val primaryColor: Color,
+    val secondaryColor: Color
 )
 
+@Immutable
 data class WatchCard(
     val id: Long,
     val title: String,
@@ -73,6 +76,14 @@ data class WatchCard(
     val intentUri: String?,
     val packageName: String
 )
+
+@Stable
+class FocusHeaderState {
+    var title by mutableStateOf("Apple TV")
+    var subtitle by mutableStateOf("Segure OK em um app para fixar ou desafixar da Dock")
+    var artUri by mutableStateOf<String?>(null)
+    var activeZone by mutableStateOf("DOCK")
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,13 +117,13 @@ fun TvOsLauncherScreen() {
         mutableStateOf(prefs.getStringSet("pinned_pkgs", null) ?: defaultPinned)
     }
 
-    fun togglePin(pkg: String) {
-        val current = pinnedPackages.toMutableSet()
-        if (!current.add(pkg)) {
-            current.remove(pkg)
+    val togglePin = remember {
+        { pkg: String ->
+            val current = pinnedPackages.toMutableSet()
+            if (!current.add(pkg)) current.remove(pkg)
+            pinnedPackages = current
+            prefs.edit().putStringSet("pinned_pkgs", current).apply()
         }
-        pinnedPackages = current
-        prefs.edit().putStringSet("pinned_pkgs", current).apply()
     }
 
     LaunchedEffect(Unit) {
@@ -140,99 +151,43 @@ fun TvOsLauncherScreen() {
         allApps.filter { it.packageName !in pinnedPackages }
     }
 
-    var focusedTitle by remember { mutableStateOf("Apple TV") }
-    var focusedSubtitle by remember { mutableStateOf("Segure OK em um app para fixar ou desafixar da Dock") }
-    var focusedArtUri by remember { mutableStateOf<String?>(null) }
-    var activeZone by remember { mutableStateOf("DOCK") }
-
+    val headerState = remember { FocusHeaderState() }
     val firstDockFocus = remember { FocusRequester() }
 
     LaunchedEffect(dockApps.isNotEmpty()) {
         if (dockApps.isNotEmpty()) {
-            delay(150)
+            delay(100)
             runCatching { firstDockFocus.requestFocus() }
         }
     }
 
-    BackHandler(enabled = activeZone != "DOCK") {
+    BackHandler(enabled = headerState.activeZone != "DOCK") {
         runCatching { firstDockFocus.requestFocus() }
     }
 
-    val palette = Aurora.forKey(focusedTitle)
-    val bgPrimary by animateColorAsState(palette.primary, tween(700), label = "bg1")
-    val bgSecondary by animateColorAsState(palette.secondary, tween(700), label = "bg2")
-
-    val heroHeight by animateDpAsState(
-        targetValue = if (activeZone == "GRID") 155.dp else 325.dp,
-        animationSpec = tween(420),
-        label = "heroHeight"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(bgPrimary, bgSecondary, Color(0xFF09090D))
-                )
-            )
-    ) {
-        if (!focusedArtUri.isNullOrEmpty()) {
-            AsyncImage(
-                model = focusedArtUri,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0.0f to Color.Black.copy(alpha = 0.35f),
-                        0.55f to Color.Transparent,
-                        0.82f to Color(0xCC0D0D12),
-                        1.0f to Color(0xF509090D)
-                    )
-                )
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Fundo isolado: só recompõe quando o foco muda, sem afetar a Dock ou a Grade
+        DynamicHeroBackground(headerState = headerState)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 42.dp)
+                .padding(horizontal = 40.dp)
         ) {
+            // 1. TOPO / HERO (Altura estática por zona, sem animateDpAsState pesado)
+            val isGrid = headerState.activeZone == "GRID"
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(heroHeight)
-                    .padding(top = 24.dp)
+                    .height(if (isGrid) 115.dp else 295.dp)
+                    .padding(top = 22.dp)
             ) {
-                Column(
+                HeroTitleBanner(
+                    headerState = headerState,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .fillMaxWidth(0.65f)
-                ) {
-                    Text(
-                        text = focusedTitle.uppercase(Locale.getDefault()),
-                        color = Color.White,
-                        fontSize = if (activeZone == "GRID") 24.sp else 36.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.2.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = focusedSubtitle,
-                        color = Color.White.copy(alpha = 0.78f),
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                        .fillMaxWidth(0.68f)
+                )
 
                 TopRightClockPill(
                     modifier = Modifier.align(Alignment.TopEnd),
@@ -243,25 +198,23 @@ fun TvOsLauncherScreen() {
                     }
                 )
 
-                if (activeZone != "GRID" && watchCards.isNotEmpty()) {
+                if (!isGrid && watchCards.isNotEmpty()) {
                     LazyRow(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(bottom = 14.dp),
+                            .padding(bottom = 18.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        items(watchCards, key = { it.id }) { card ->
+                        items(watchCards, key = { it.id }, contentType = { "watch_card" }) { card ->
                             WatchNextCardItem(
                                 card = card,
                                 onFocus = {
-                                    activeZone = "TOP"
-                                    focusedTitle = card.title
-                                    focusedSubtitle = card.subtitle.ifEmpty { "Continuar assistindo" }
-                                    focusedArtUri = card.posterArtUri
+                                    headerState.activeZone = "TOP"
+                                    headerState.title = card.title
+                                    headerState.subtitle = card.subtitle.ifEmpty { "Continuar assistindo" }
+                                    headerState.artUri = card.posterArtUri
                                 },
-                                onClick = {
-                                    launchWatchCard(context, card)
-                                }
+                                onClick = { launchWatchCard(context, card) }
                             )
                         }
                     }
@@ -269,7 +222,7 @@ fun TvOsLauncherScreen() {
 
                 Text(
                     text = "Segure OK para fixar/remover da Dock  •  Desça para todos os apps",
-                    color = Color.White.copy(alpha = 0.55f),
+                    color = Color.White.copy(alpha = 0.5f),
                     fontSize = 11.sp,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -277,83 +230,82 @@ fun TvOsLauncherScreen() {
                 )
             }
 
+            // 2. DOCK TRANSLÚCIDO OTIMIZADO (Apenas Fixados)
+            val dockBrush = remember {
+                Brush.verticalGradient(
+                    colors = listOf(Color(0x99383134), Color(0xAA1C181A))
+                )
+            }
+            val dockBorderBrush = remember {
+                Brush.verticalGradient(
+                    colors = listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.08f))
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                contentAlignment = Alignment.Center
+                    .padding(vertical = 4.dp)
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(dockBrush)
+                    .border(1.dp, dockBorderBrush, RoundedCornerShape(26.dp))
+                    .padding(horizontal = 20.dp, vertical = 14.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0x883A3335),
-                                    Color(0x991F1B1D)
-                                )
-                            )
-                        )
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.35f),
-                                    Color.White.copy(alpha = 0.08f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(28.dp)
-                        )
-                        .padding(horizontal = 22.dp, vertical = 14.dp)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(dockApps.size, key = { dockApps[it].packageName }) { index ->
-                            val app = dockApps[index]
-                            TvOsAppTile(
-                                app = app,
-                                width = 122.dp,
-                                height = 70.dp,
-                                modifier = if (index == 0) Modifier.focusRequester(firstDockFocus) else Modifier,
-                                onFocus = {
-                                    activeZone = "DOCK"
-                                    focusedTitle = app.label
-                                    focusedSubtitle = "Aplicativo fixado na Dock (Segure OK para desafixar)"
-                                    focusedArtUri = null
-                                },
-                                onClick = { launchApp(context, app.packageName) },
-                                onLongClick = { togglePin(app.packageName) }
-                            )
-                        }
+                    items(
+                        count = dockApps.size,
+                        key = { dockApps[it].packageName },
+                        contentType = { "dock_tile" }
+                    ) { index ->
+                        val app = dockApps[index]
+                        TvOsAppTile(
+                            app = app,
+                            width = 120.dp,
+                            height = 68.dp,
+                            modifier = if (index == 0) Modifier.focusRequester(firstDockFocus) else Modifier,
+                            onFocus = {
+                                headerState.activeZone = "DOCK"
+                                headerState.title = app.label
+                                headerState.subtitle = "Aplicativo fixado na Dock (Segure OK para desafixar)"
+                                headerState.artUri = null
+                            },
+                            onClick = { launchApp(context, app.packageName) },
+                            onLongClick = { togglePin(app.packageName) }
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // 3. EMBAIXO: GRADE DE APPS RESTANTES (60 FPS)
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(top = 6.dp, bottom = 48.dp),
+                contentPadding = PaddingValues(top = 6.dp, bottom = 42.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                items(gridApps, key = { it.packageName }) { app ->
+                items(
+                    items = gridApps,
+                    key = { it.packageName },
+                    contentType = { "grid_tile" }
+                ) { app ->
                     TvOsAppTile(
                         app = app,
-                        width = 122.dp,
-                        height = 68.dp,
+                        width = 120.dp,
+                        height = 66.dp,
                         onFocus = {
-                            activeZone = "GRID"
-                            focusedTitle = app.label
-                            focusedSubtitle = "Mais aplicativos (Segure OK para fixar na Dock)"
-                            focusedArtUri = null
+                            headerState.activeZone = "GRID"
+                            headerState.title = app.label
+                            headerState.subtitle = "Mais aplicativos (Segure OK para fixar na Dock)"
+                            headerState.artUri = null
                         },
                         onClick = { launchApp(context, app.packageName) },
                         onLongClick = { togglePin(app.packageName) }
@@ -361,6 +313,79 @@ fun TvOsLauncherScreen() {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DynamicHeroBackground(headerState: FocusHeaderState) {
+    val context = LocalContext.current
+    val palette = remember(headerState.title) { Aurora.forKey(headerState.title) }
+    val bgBrush = remember(palette) {
+        Brush.verticalGradient(
+            colors = listOf(palette.primary, palette.secondary, Color(0xFF09090D))
+        )
+    }
+    val vignetteBrush = remember {
+        Brush.verticalGradient(
+            0.0f to Color.Black.copy(alpha = 0.3f),
+            0.55f to Color.Transparent,
+            0.82f to Color(0xCC0D0D12),
+            1.0f to Color(0xF509090D)
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(bgBrush)
+    ) {
+        val uri = headerState.artUri
+        if (!uri.isNullOrEmpty()) {
+            val req = remember(uri) {
+                ImageRequest.Builder(context)
+                    .data(uri)
+                    .size(640, 360) // Downsample para não estourar a VRAM da Mi TV Stick
+                    .crossfade(false)
+                    .build()
+            }
+            AsyncImage(
+                model = req,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(vignetteBrush)
+        )
+    }
+}
+
+@Composable
+fun HeroTitleBanner(
+    headerState: FocusHeaderState,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = headerState.title.uppercase(Locale.getDefault()),
+            color = Color.White,
+            fontSize = if (headerState.activeZone == "GRID") 24.sp else 34.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 1.1.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = headerState.subtitle,
+            color = Color.White.copy(alpha = 0.75f),
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -376,14 +401,14 @@ fun TopRightClockPill(
         val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
         while (true) {
             timeText = sdf.format(Date())
-            delay(10_000)
+            delay(15_000)
         }
     }
 
     Row(
         modifier = modifier
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.38f))
+            .background(Color(0x66000000))
             .border(
                 width = 1.dp,
                 color = if (gearFocused) Color.White else Color.White.copy(alpha = 0.22f),
@@ -430,30 +455,30 @@ fun TvOsAppTile(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.13f else 1.0f,
-        animationSpec = tween(180),
-        label = "tileScale"
+        targetValue = if (isFocused) 1.11f else 1.0f,
+        animationSpec = tween(120),
+        label = "s"
     )
 
-    val tileColor = remember(app.packageName) {
-        val p = Aurora.forKey(app.packageName)
-        listOf(p.primary, p.secondary)
+    val cardBrush = remember(app.packageName) {
+        Brush.linearGradient(listOf(app.primaryColor, app.secondaryColor))
     }
+    val shape = remember { RoundedCornerShape(15.dp) }
 
     Box(
         modifier = modifier
             .size(width, height)
-            .scale(scale)
-            .shadow(
-                elevation = if (isFocused) 18.dp else 4.dp,
-                shape = RoundedCornerShape(16.dp)
-            )
-            .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(tileColor))
+            // graphicsLayer executa o zoom direto na GPU sem forçar relayout dos vizinhos
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(shape)
+            .background(cardBrush)
             .border(
                 width = if (isFocused) 2.5.dp else 0.5.dp,
                 color = if (isFocused) Color.White else Color.White.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(16.dp)
+                shape = shape
             )
             .onFocusChanged { state ->
                 isFocused = state.isFocused
@@ -467,7 +492,7 @@ fun TvOsAppTile(
     ) {
         if (app.banner != null) {
             Image(
-                bitmap = app.banner.asImageBitmap(),
+                bitmap = app.banner,
                 contentDescription = app.label,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -481,9 +506,9 @@ fun TvOsAppTile(
                     .padding(horizontal = 8.dp)
             ) {
                 Image(
-                    bitmap = app.icon.asImageBitmap(),
+                    bitmap = app.icon,
                     contentDescription = app.label,
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(32.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
@@ -499,7 +524,7 @@ fun TvOsAppTile(
             Text(
                 text = app.label,
                 color = Color.White,
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -515,19 +540,24 @@ fun WatchNextCardItem(
     onFocus: () -> Unit,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (isFocused) 1.08f else 1.0f, tween(180), label = "watchScale")
+    val scale by animateFloatAsState(if (isFocused) 1.07f else 1.0f, tween(120), label = "ws")
+    val shape = remember { RoundedCornerShape(13.dp) }
 
     Box(
         modifier = Modifier
-            .size(width = 168.dp, height = 94.dp)
-            .scale(scale)
-            .clip(RoundedCornerShape(14.dp))
+            .size(width = 160.dp, height = 90.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(shape)
             .background(Color(0xFF1E1E28))
             .border(
                 width = if (isFocused) 2.dp else 0.5.dp,
                 color = if (isFocused) Color.White else Color.White.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(14.dp)
+                shape = shape
             )
             .onFocusChanged {
                 isFocused = it.isFocused
@@ -536,8 +566,15 @@ fun WatchNextCardItem(
             .clickable { onClick() }
     ) {
         if (!card.posterArtUri.isNullOrEmpty()) {
+            val req = remember(card.posterArtUri) {
+                ImageRequest.Builder(context)
+                    .data(card.posterArtUri)
+                    .size(320, 180)
+                    .crossfade(false)
+                    .build()
+            }
             AsyncImage(
-                model = card.posterArtUri,
+                model = req,
                 contentDescription = card.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -546,11 +583,7 @@ fun WatchNextCardItem(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                    )
-                )
+                .background(Color(0x66000000))
                 .padding(8.dp),
             contentAlignment = Alignment.BottomStart
         ) {
@@ -566,7 +599,7 @@ fun WatchNextCardItem(
     }
 }
 
-fun drawableToBitmap(drawable: Drawable?, maxW: Int, maxH: Int): Bitmap? {
+fun drawableToImageBitmap(drawable: Drawable?, maxW: Int, maxH: Int): ImageBitmap? {
     if (drawable == null) return null
     return runCatching {
         val w = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth.coerceAtMost(maxW) else maxW
@@ -575,7 +608,7 @@ fun drawableToBitmap(drawable: Drawable?, maxW: Int, maxH: Int): Bitmap? {
         val canvas = Canvas(bmp)
         drawable.setBounds(0, 0, canvas.width, canvas.height)
         drawable.draw(canvas)
-        bmp
+        bmp.asImageBitmap()
     }.getOrNull()
 }
 
@@ -596,13 +629,17 @@ fun loadInstalledApps(context: Context): List<AppEntry> {
             if (pkg == selfPkg || results.containsKey(pkg)) continue
             val label = ri.loadLabel(pm)?.toString() ?: pkg
             val bannerDrawable = runCatching { ri.activityInfo.loadBanner(pm) ?: pm.getApplicationBanner(pkg) }.getOrNull()
-            val iconDrawable = runCatching { ri.activityInfo.loadIcon(pm) }.getOrNull()
+            val iconDrawable = if (bannerDrawable == null) runCatching { ri.activityInfo.loadIcon(pm) }.getOrNull() else null
+            val palette = Aurora.forKey(pkg)
 
             results[pkg] = AppEntry(
                 packageName = pkg,
                 label = label,
-                banner = drawableToBitmap(bannerDrawable, 320, 180),
-                icon = drawableToBitmap(iconDrawable, 128, 128)
+                // Resolução reduzida na medida exata do card para economizar RAM da Mi TV Stick
+                banner = drawableToImageBitmap(bannerDrawable, 240, 135),
+                icon = drawableToImageBitmap(iconDrawable, 72, 72),
+                primaryColor = palette.primary,
+                secondaryColor = palette.secondary
             )
         }
     }
@@ -627,7 +664,7 @@ fun loadWatchNextCards(context: Context): List<WatchCard> {
                 val intentIdx = cursor.getColumnIndex("intent_uri")
                 val pkgIdx = cursor.getColumnIndex("package_name")
 
-                while (cursor.moveToNext() && list.size < 12) {
+                while (cursor.moveToNext() && list.size < 10) {
                     val title = if (titleIdx >= 0) cursor.getString(titleIdx) else null
                     if (title.isNullOrBlank()) continue
                     list.add(

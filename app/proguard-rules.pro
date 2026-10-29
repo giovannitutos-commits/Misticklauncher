@@ -1,0 +1,2 @@
+-keep class br.com.mi.atv.launcher.** { *; }
+-dontwarn coil.**
