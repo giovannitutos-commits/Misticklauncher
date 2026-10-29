@@ -1,7 +1,9 @@
 package br.com.mi.atv.launcher
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -49,6 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
@@ -80,22 +84,34 @@ data class WatchCard(
 @Stable
 class FocusHeaderState {
     var title by mutableStateOf("Apple TV")
-    var subtitle by mutableStateOf("Segure OK em um app para fixar ou desafixar da Dock")
+    var subtitle by mutableStateOf("")
     var artUri by mutableStateOf<String?>(null)
     var activeZone by mutableStateOf("DOCK")
 }
 
 class MainActivity : ComponentActivity() {
+    private var resumeTrigger by mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            TvOsLauncherScreen()
+        if (ContextCompat.checkSelfPermission(this, "android.permission.READ_TV_LISTINGS") != PackageManager.PERMISSION_GRANTED) {
+            runCatching {
+                ActivityCompat.requestPermissions(this, arrayOf("android.permission.READ_TV_LISTINGS"), 101)
+            }
         }
+        setContent {
+            TvOsLauncherScreen(resumeTrigger = resumeTrigger)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        resumeTrigger++
     }
 }
 
 @Composable
-fun TvOsLauncherScreen() {
+fun TvOsLauncherScreen(resumeTrigger: Int) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("tvos_launcher_prefs", Context.MODE_PRIVATE) }
 
@@ -140,6 +156,12 @@ fun TvOsLauncherScreen() {
                 pinnedPackages = initialSet
                 prefs.edit().putStringSet("pinned_pkgs", initialSet).apply()
             }
+        }
+    }
+
+    // Recarrega os cartões do Nuvio sempre que a tela volta ao foco (onResume)
+    LaunchedEffect(resumeTrigger) {
+        withContext(Dispatchers.IO) {
             watchCards = loadWatchNextCards(context)
         }
     }
@@ -166,27 +188,25 @@ fun TvOsLauncherScreen() {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Fundo isolado: só recompõe quando o foco muda, sem afetar a Dock ou a Grade
         DynamicHeroBackground(headerState = headerState)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 40.dp)
+                .padding(horizontal = 42.dp)
         ) {
-            // 1. TOPO / HERO (Altura estática por zona, sem animateDpAsState pesado)
             val isGrid = headerState.activeZone == "GRID"
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isGrid) 115.dp else 295.dp)
+                    .height(if (isGrid) 110.dp else 295.dp)
                     .padding(top = 22.dp)
             ) {
                 HeroTitleBanner(
                     headerState = headerState,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .fillMaxWidth(0.68f)
+                        .fillMaxWidth(0.70f)
                 )
 
                 TopRightClockPill(
@@ -202,7 +222,7 @@ fun TvOsLauncherScreen() {
                     LazyRow(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(bottom = 18.dp),
+                            .padding(bottom = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         items(watchCards, key = { it.id }, contentType = { "watch_card" }) { card ->
@@ -219,18 +239,9 @@ fun TvOsLauncherScreen() {
                         }
                     }
                 }
-
-                Text(
-                    text = "Segure OK para fixar/remover da Dock  •  Desça para todos os apps",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 11.sp,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 2.dp)
-                )
             }
 
-            // 2. DOCK TRANSLÚCIDO OTIMIZADO (Apenas Fixados)
+            // 2. DOCK TRANSLÚCIDA CENTRADA (Sem buraco vazio à direita)
             val dockBrush = remember {
                 Brush.verticalGradient(
                     colors = listOf(Color(0x99383134), Color(0xAA1C181A))
@@ -238,51 +249,56 @@ fun TvOsLauncherScreen() {
             }
             val dockBorderBrush = remember {
                 Brush.verticalGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.08f))
+                    colors = listOf(Color.White.copy(alpha = 0.34f), Color.White.copy(alpha = 0.08f))
                 )
             }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(dockBrush)
-                    .border(1.dp, dockBorderBrush, RoundedCornerShape(26.dp))
-                    .padding(horizontal = 20.dp, vertical = 14.dp)
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center
             ) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                Box(
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(dockBrush)
+                        .border(1.dp, dockBorderBrush, RoundedCornerShape(26.dp))
+                        .padding(horizontal = 20.dp, vertical = 14.dp)
                 ) {
-                    items(
-                        count = dockApps.size,
-                        key = { dockApps[it].packageName },
-                        contentType = { "dock_tile" }
-                    ) { index ->
-                        val app = dockApps[index]
-                        TvOsAppTile(
-                            app = app,
-                            width = 120.dp,
-                            height = 68.dp,
-                            modifier = if (index == 0) Modifier.focusRequester(firstDockFocus) else Modifier,
-                            onFocus = {
-                                headerState.activeZone = "DOCK"
-                                headerState.title = app.label
-                                headerState.subtitle = "Aplicativo fixado na Dock (Segure OK para desafixar)"
-                                headerState.artUri = null
-                            },
-                            onClick = { launchApp(context, app.packageName) },
-                            onLongClick = { togglePin(app.packageName) }
-                        )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        items(
+                            count = dockApps.size,
+                            key = { dockApps[it].packageName },
+                            contentType = { "dock_tile" }
+                        ) { index ->
+                            val app = dockApps[index]
+                            TvOsAppTile(
+                                app = app,
+                                width = 128.dp,
+                                height = 72.dp,
+                                modifier = if (index == 0) Modifier.focusRequester(firstDockFocus) else Modifier,
+                                onFocus = {
+                                    headerState.activeZone = "DOCK"
+                                    headerState.title = app.label
+                                    headerState.subtitle = ""
+                                    headerState.artUri = null
+                                },
+                                onClick = { launchApp(context, app.packageName) },
+                                onLongClick = { togglePin(app.packageName) }
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // 3. EMBAIXO: GRADE DE APPS RESTANTES (60 FPS)
+            // 3. EMBAIXO: GRELHA DE APPS RESTANTES
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -304,7 +320,7 @@ fun TvOsLauncherScreen() {
                         onFocus = {
                             headerState.activeZone = "GRID"
                             headerState.title = app.label
-                            headerState.subtitle = "Mais aplicativos (Segure OK para fixar na Dock)"
+                            headerState.subtitle = "Segure OK para fixar na Dock"
                             headerState.artUri = null
                         },
                         onClick = { launchApp(context, app.packageName) },
@@ -344,7 +360,7 @@ fun DynamicHeroBackground(headerState: FocusHeaderState) {
             val req = remember(uri) {
                 ImageRequest.Builder(context)
                     .data(uri)
-                    .size(640, 360) // Downsample para não estourar a VRAM da Mi TV Stick
+                    .size(640, 360)
                     .crossfade(false)
                     .build()
             }
@@ -378,14 +394,16 @@ fun HeroTitleBanner(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = headerState.subtitle,
-            color = Color.White.copy(alpha = 0.75f),
-            fontSize = 13.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        if (headerState.subtitle.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = headerState.subtitle,
+                color = Color.White.copy(alpha = 0.75f),
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -468,7 +486,6 @@ fun TvOsAppTile(
     Box(
         modifier = modifier
             .size(width, height)
-            // graphicsLayer executa o zoom direto na GPU sem forçar relayout dos vizinhos
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -547,7 +564,7 @@ fun WatchNextCardItem(
 
     Box(
         modifier = Modifier
-            .size(width = 160.dp, height = 90.dp)
+            .size(width = 165.dp, height = 92.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -555,7 +572,7 @@ fun WatchNextCardItem(
             .clip(shape)
             .background(Color(0xFF1E1E28))
             .border(
-                width = if (isFocused) 2.dp else 0.5.dp,
+                width = if (isFocused) 2.5.dp else 0.5.dp,
                 color = if (isFocused) Color.White else Color.White.copy(alpha = 0.2f),
                 shape = shape
             )
@@ -615,6 +632,11 @@ fun drawableToImageBitmap(drawable: Drawable?, maxW: Int, maxH: Int): ImageBitma
 fun loadInstalledApps(context: Context): List<AppEntry> {
     val pm = context.packageManager
     val selfPkg = context.packageName
+    val hiddenBloat = setOf(
+        "com.mitv.tvhome",
+        "com.google.android.tv",
+        "com.android.tv.settings"
+    )
     val results = LinkedHashMap<String, AppEntry>()
 
     val intents = listOf(
@@ -626,8 +648,10 @@ fun loadInstalledApps(context: Context): List<AppEntry> {
         val activities = pm.queryIntentActivities(intent, 0)
         for (ri in activities) {
             val pkg = ri.activityInfo.packageName
-            if (pkg == selfPkg || results.containsKey(pkg)) continue
+            if (pkg == selfPkg || pkg in hiddenBloat || results.containsKey(pkg)) continue
             val label = ri.loadLabel(pm)?.toString() ?: pkg
+            if (label.equals("PatchWall", ignoreCase = true) || label.equals("Live Channels", ignoreCase = true)) continue
+
             val bannerDrawable = runCatching { ri.activityInfo.loadBanner(pm) ?: pm.getApplicationBanner(pkg) }.getOrNull()
             val iconDrawable = if (bannerDrawable == null) runCatching { ri.activityInfo.loadIcon(pm) }.getOrNull() else null
             val palette = Aurora.forKey(pkg)
@@ -635,7 +659,6 @@ fun loadInstalledApps(context: Context): List<AppEntry> {
             results[pkg] = AppEntry(
                 packageName = pkg,
                 label = label,
-                // Resolução reduzida na medida exata do card para economizar RAM da Mi TV Stick
                 banner = drawableToImageBitmap(bannerDrawable, 240, 135),
                 icon = drawableToImageBitmap(iconDrawable, 72, 72),
                 primaryColor = palette.primary,
@@ -661,10 +684,10 @@ fun loadWatchNextCards(context: Context): List<WatchCard> {
                 val titleIdx = cursor.getColumnIndex("title")
                 val descIdx = cursor.getColumnIndex("short_description")
                 val artIdx = cursor.getColumnIndex("poster_art_uri")
-                val intentIdx = cursor.getColumnIndex("intent_uri")
                 val pkgIdx = cursor.getColumnIndex("package_name")
+                val intentIdx = cursor.getColumnIndex("intent_uri")
 
-                while (cursor.moveToNext() && list.size < 10) {
+                while (cursor.moveToNext() && list.size < 12) {
                     val title = if (titleIdx >= 0) cursor.getString(titleIdx) else null
                     if (title.isNullOrBlank()) continue
                     list.add(
