@@ -265,9 +265,9 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         .wrapContentWidth()
                         .background(dockBrush, dockShape)
                         .border(1.dp, dockBorderBrush, dockShape)
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
                 ) {
                     LazyRow(
+                        contentPadding = PaddingValues(horizontal = 28.dp, vertical = 18.dp),
                         horizontalArrangement = Arrangement.spacedBy(18.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
