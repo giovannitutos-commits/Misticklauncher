@@ -1,6 +1,5 @@
 package br.com.mi.atv.launcher
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -51,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
@@ -159,7 +159,6 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
         }
     }
 
-    // Recarrega os cartões do Nuvio sempre que a tela volta ao foco (onResume)
     LaunchedEffect(resumeTrigger) {
         withContext(Dispatchers.IO) {
             watchCards = loadWatchNextCards(context)
@@ -199,7 +198,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isGrid) 110.dp else 295.dp)
+                    .height(if (isGrid) 110.dp else 290.dp)
                     .padding(top = 22.dp)
             ) {
                 HeroTitleBanner(
@@ -223,7 +222,8 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(watchCards, key = { it.id }, contentType = { "watch_card" }) { card ->
                             WatchNextCardItem(
@@ -241,7 +241,8 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 }
             }
 
-            // 2. DOCK TRANSLÚCIDA CENTRADA (Sem buraco vazio à direita)
+            // 2. DOCK TRANSLÚCIDA COM MARGEM PARA O ZOOM NÃO CORTAR OS CANTOS
+            val dockShape = remember { RoundedCornerShape(28.dp) }
             val dockBrush = remember {
                 Brush.verticalGradient(
                     colors = listOf(Color(0x99383134), Color(0xAA1C181A))
@@ -262,13 +263,12 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 Box(
                     modifier = Modifier
                         .wrapContentWidth()
-                        .clip(RoundedCornerShape(26.dp))
-                        .background(dockBrush)
-                        .border(1.dp, dockBorderBrush, RoundedCornerShape(26.dp))
-                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                        .background(dockBrush, dockShape)
+                        .border(1.dp, dockBorderBrush, dockShape)
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
                 ) {
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(18.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         items(
@@ -296,14 +296,14 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // 3. EMBAIXO: GRELHA DE APPS RESTANTES
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(top = 6.dp, bottom = 42.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, top = 8.dp, bottom = 42.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -315,8 +315,8 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 ) { app ->
                     TvOsAppTile(
                         app = app,
-                        width = 120.dp,
-                        height = 66.dp,
+                        width = 124.dp,
+                        height = 70.dp,
                         onFocus = {
                             headerState.activeZone = "GRID"
                             headerState.title = app.label
@@ -473,29 +473,32 @@ fun TvOsAppTile(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.11f else 1.0f,
-        animationSpec = tween(120),
+        targetValue = if (isFocused) 1.12f else 1.0f,
+        animationSpec = tween(130),
         label = "s"
     )
 
     val cardBrush = remember(app.packageName) {
         Brush.linearGradient(listOf(app.primaryColor, app.secondaryColor))
     }
-    val shape = remember { RoundedCornerShape(15.dp) }
+    val cardShape = remember { RoundedCornerShape(16.dp) }
 
     Box(
         modifier = modifier
+            .zIndex(if (isFocused) 10f else 1f)
             .size(width, height)
+            // Aplica o recorte redondo e a escala diretamente na GPU
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
+                shape = cardShape
+                clip = true
             }
-            .clip(shape)
-            .background(cardBrush)
+            .background(cardBrush, cardShape)
             .border(
                 width = if (isFocused) 2.5.dp else 0.5.dp,
-                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.15f),
-                shape = shape
+                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.18f),
+                shape = cardShape
             )
             .onFocusChanged { state ->
                 isFocused = state.isFocused
@@ -511,8 +514,10 @@ fun TvOsAppTile(
             Image(
                 bitmap = app.banner,
                 contentDescription = app.label,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(cardShape)
             )
         } else if (app.icon != null) {
             Row(
@@ -559,22 +564,24 @@ fun WatchNextCardItem(
 ) {
     val context = LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (isFocused) 1.07f else 1.0f, tween(120), label = "ws")
-    val shape = remember { RoundedCornerShape(13.dp) }
+    val scale by animateFloatAsState(if (isFocused) 1.08f else 1.0f, tween(130), label = "ws")
+    val cardShape = remember { RoundedCornerShape(14.dp) }
 
     Box(
         modifier = Modifier
-            .size(width = 165.dp, height = 92.dp)
+            .zIndex(if (isFocused) 10f else 1f)
+            .size(width = 166.dp, height = 94.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
+                shape = cardShape
+                clip = true
             }
-            .clip(shape)
-            .background(Color(0xFF1E1E28))
+            .background(Color(0xFF1E1E28), cardShape)
             .border(
                 width = if (isFocused) 2.5.dp else 0.5.dp,
-                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.2f),
-                shape = shape
+                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.22f),
+                shape = cardShape
             )
             .onFocusChanged {
                 isFocused = it.isFocused
@@ -594,13 +601,15 @@ fun WatchNextCardItem(
                 model = req,
                 contentDescription = card.title,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(cardShape)
             )
         }
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x66000000))
+                .background(Color(0x55000000))
                 .padding(8.dp),
             contentAlignment = Alignment.BottomStart
         ) {
@@ -616,14 +625,13 @@ fun WatchNextCardItem(
     }
 }
 
-fun drawableToImageBitmap(drawable: Drawable?, maxW: Int, maxH: Int): ImageBitmap? {
+fun drawableToBannerBitmap(drawable: Drawable?, targetW: Int, targetH: Int): ImageBitmap? {
     if (drawable == null) return null
     return runCatching {
-        val w = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth.coerceAtMost(maxW) else maxW
-        val h = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight.coerceAtMost(maxH) else maxH
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        // Renderiza na proporção exata 16:9 sem cortar a lateral direita do banner
+        val bmp = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
-        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.setBounds(0, 0, targetW, targetH)
         drawable.draw(canvas)
         bmp.asImageBitmap()
     }.getOrNull()
@@ -659,8 +667,8 @@ fun loadInstalledApps(context: Context): List<AppEntry> {
             results[pkg] = AppEntry(
                 packageName = pkg,
                 label = label,
-                banner = drawableToImageBitmap(bannerDrawable, 240, 135),
-                icon = drawableToImageBitmap(iconDrawable, 72, 72),
+                banner = drawableToBannerBitmap(bannerDrawable, 320, 180),
+                icon = drawableToBannerBitmap(iconDrawable, 80, 80),
                 primaryColor = palette.primary,
                 secondaryColor = palette.secondary
             )
