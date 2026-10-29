@@ -303,7 +303,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 columns = GridCells.Fixed(6),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, top = 8.dp, bottom = 42.dp),
+                contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 42.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
