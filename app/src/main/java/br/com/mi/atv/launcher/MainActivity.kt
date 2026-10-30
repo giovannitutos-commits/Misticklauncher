@@ -118,9 +118,10 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
     var watchCards by remember { mutableStateOf<List<WatchCard>>(emptyList()) }
     var randomCinematicBg by remember { mutableStateOf("") }
     var googleUserPhoto by remember { mutableStateOf(prefs.getString("google_user_photo", "") ?: "") }
+    var showSettingsModal by remember { mutableStateOf(false) }
 
     val defaultPinned = remember {
-        setOf(
+        listOf(
             "com.apple.tv",
             "com.nuvio.tv",
             "com.netflix.ninja",
@@ -130,27 +131,27 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
         )
     }
 
-    var pinnedPackages by remember {
-        mutableStateOf(prefs.getStringSet("pinned_pkgs", null) ?: defaultPinned)
+    var pinnedList by remember {
+        val saved = prefs.getString("pinned_list_order", null)
+        if (!saved.isNullOrEmpty()) {
+            mutableStateOf(saved.split(",").filter { it.isNotBlank() })
+        } else {
+            mutableStateOf(defaultPinned)
+        }
     }
 
-    val togglePin = remember {
-        { pkg: String ->
-            val current = pinnedPackages.toMutableSet()
-            if (!current.add(pkg)) current.remove(pkg)
-            pinnedPackages = current
-            prefs.edit().putStringSet("pinned_pkgs", current).apply()
-        }
+    val savePinned = { newList: List<String> ->
+        pinnedList = newList
+        prefs.edit().putString("pinned_list_order", newList.joinToString(",")).apply()
     }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             allApps = loadInstalledApps(context)
-            if (prefs.getStringSet("pinned_pkgs", null) == null) {
-                val installedDefaults = allApps.map { it.packageName }.filter { it in defaultPinned }.toSet()
-                val initialSet = if (installedDefaults.isNotEmpty()) installedDefaults else allApps.take(6).map { it.packageName }.toSet()
-                pinnedPackages = initialSet
-                prefs.edit().putStringSet("pinned_pkgs", initialSet).apply()
+            if (prefs.getString("pinned_list_order", null) == null) {
+                val installedDefaults = allApps.map { it.packageName }.filter { it in defaultPinned }
+                val initialList = if (installedDefaults.isNotEmpty()) installedDefaults else allApps.take(6).map { it.packageName }
+                savePinned(initialList)
             }
         }
     }
@@ -172,25 +173,29 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
         }
     }
 
-    val dockApps = remember(allApps, pinnedPackages) {
-        allApps.filter { it.packageName in pinnedPackages }
+    val dockApps = remember(allApps, pinnedList) {
+        pinnedList.mapNotNull { pkg -> allApps.find { it.packageName == pkg } }
     }
-    val gridApps = remember(allApps, pinnedPackages) {
-        allApps.filter { it.packageName !in pinnedPackages }
+    val gridApps = remember(allApps, pinnedList) {
+        allApps.filter { it.packageName !in pinnedList }
     }
 
     val headerState = remember { FocusHeaderState() }
     val firstDockFocus = remember { FocusRequester() }
 
     LaunchedEffect(dockApps.isNotEmpty()) {
-        if (dockApps.isNotEmpty()) {
+        if (dockApps.isNotEmpty() && !showSettingsModal) {
             delay(100)
             runCatching { firstDockFocus.requestFocus() }
         }
     }
 
-    BackHandler(enabled = headerState.activeZone != "DOCK") {
-        runCatching { firstDockFocus.requestFocus() }
+    BackHandler(enabled = showSettingsModal || headerState.activeZone != "DOCK") {
+        if (showSettingsModal) {
+            showSettingsModal = false
+        } else {
+            runCatching { firstDockFocus.requestFocus() }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -212,15 +217,11 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
 
                 TopRightProfileClock(
                     userPhotoUrl = googleUserPhoto,
-                    onOpenSettings = {
-                        runCatching {
-                            context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                        }
-                    },
+                    onOpenSettings = { showSettingsModal = true },
                     modifier = Modifier.align(Alignment.TopEnd)
                 )
 
-                if (!isGrid && watchCards.isNotEmpty()) {
+                if (!isGrid && watchCards.isNotEmpty() && !showSettingsModal) {
                     LazyRow(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
@@ -313,7 +314,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                     headerState.artUri = null
                                 },
                                 onClick = { launchApp(context, app.packageName) },
-                                onAction = { togglePin(app.packageName) }
+                                onLongClick = { showSettingsModal = true }
                             )
                         }
                     }
@@ -343,12 +344,119 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         onFocus = {
                             headerState.activeZone = "GRID"
                             headerState.title = app.label
-                            headerState.subtitle = "Pressione OK para abrir • Clique longo para fixar na Dock"
+                            headerState.subtitle = "Clique na foto de perfil para gerir a Dock"
                             headerState.artUri = null
                         },
                         onClick = { launchApp(context, app.packageName) },
-                        onAction = { togglePin(app.packageName) }
+                        onLongClick = {
+                            val newList = pinnedList + app.packageName
+                            savePinned(newList)
+                        }
                     )
+                }
+            }
+        }
+
+        // Modal de Personalização da Dock ao clicar na foto de perfil
+        if (showSettingsModal) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xCC000000))
+                    .padding(40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .fillMaxHeight(0.85f)
+                        .background(Color(0xFF1E1E24), RoundedCornerShape(24.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Personalizar Aplicativos da Dock",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Gerencie a ordem e os apps fixados na sua Dock",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Lista de Apps Atuais na Dock com botões para mover / remover
+                    Text(text = "Apps na Dock (Atuais):", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(90.dp)
+                    ) {
+                        items(pinnedList, key = { it }) { pkg ->
+                            val app = allApps.find { it.packageName == pkg }
+                            if (app != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(100.dp, 70.dp)
+                                        .background(app.primaryColor, RoundedCornerShape(12.dp))
+                                        .border(1.5.dp, Color.White, RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            // Remove da dock ao clicar
+                                            val newList = pinnedList.toMutableList().apply { remove(pkg) }
+                                            savePinned(newList)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = app.label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(4.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = "Apps Disponíveis para Adicionar:", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth().weight(1f)
+                    ) {
+                        items(gridApps, key = { it.packageName }) { app ->
+                            Box(
+                                modifier = Modifier
+                                    .height(55.dp)
+                                    .background(app.secondaryColor, RoundedCornerShape(10.dp))
+                                    .border(0.8.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        val newList = pinnedList + app.packageName
+                                        savePinned(newList)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = "+ " + app.label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 8.dp))
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF007AFF))
+                            .clickable { showSettingsModal = false }
+                            .padding(horizontal = 32.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "Concluído", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -463,12 +571,12 @@ fun TopRightProfileClock(
             if (userPhotoUrl.isNotEmpty()) {
                 AsyncImage(
                     model = userPhotoUrl,
-                    contentDescription = "Perfil",
+                    contentDescription = "Definições e Perfil",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().clip(CircleShape)
                 )
             } else {
-                Text(text = "G", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(text = "⚙️", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -483,7 +591,7 @@ fun TvOsAppTile(
     modifier: Modifier = Modifier,
     onFocus: () -> Unit,
     onClick: () -> Unit,
-    onAction: () -> Unit
+    onLongClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -518,7 +626,7 @@ fun TvOsAppTile(
             }
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onAction
+                onLongClick = onLongClick
             ),
         contentAlignment = Alignment.Center
     ) {
