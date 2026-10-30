@@ -570,7 +570,7 @@ fun WatchNextCardItem(
     Box(
         modifier = Modifier
             .zIndex(if (isFocused) 10f else 1f)
-            .size(width = 166.dp, height = 94.dp)
+            .size(width = 180.dp, height = 100.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -593,7 +593,7 @@ fun WatchNextCardItem(
             val req = remember(card.posterArtUri) {
                 ImageRequest.Builder(context)
                     .data(card.posterArtUri)
-                    .size(320, 180)
+                    .size(360, 200)
                     .crossfade(false)
                     .build()
             }
