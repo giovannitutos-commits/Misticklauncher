@@ -50,7 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
@@ -83,7 +82,7 @@ data class WatchCard(
 
 @Stable
 class FocusHeaderState {
-    var title by mutableStateOf("Apple TV")
+    var title by mutableStateOf("Sugar") // Estilo da referência visual
     var subtitle by mutableStateOf("")
     var artUri by mutableStateOf<String?>(null)
     var activeZone by mutableStateOf("DOCK")
@@ -117,15 +116,16 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
 
     var allApps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
     var watchCards by remember { mutableStateOf<List<WatchCard>>(emptyList()) }
+    var randomCinematicBg by remember { mutableStateOf("") }
 
     val defaultPinned = remember {
         setOf(
+            "com.apple.tv",
             "com.nuvio.tv",
             "com.netflix.ninja",
             "com.google.android.youtube.tv",
-            "com.amazon.amazonvideo.livingroom",
-            "com.disney.disneyplus",
-            "com.spotify.tv.android"
+            "com.spotify.tv.android",
+            "com.amazon.amazonvideo.livingroom"
         )
     }
 
@@ -144,24 +144,29 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            val loadedApps = loadInstalledApps(context)
-            allApps = loadedApps
+            allApps = loadInstalledApps(context)
             if (prefs.getStringSet("pinned_pkgs", null) == null) {
-                val installedDefaults = loadedApps.map { it.packageName }.filter { it in defaultPinned }.toSet()
-                val initialSet = if (installedDefaults.isNotEmpty()) {
-                    installedDefaults
-                } else {
-                    loadedApps.take(6).map { it.packageName }.toSet()
-                }
+                val installedDefaults = allApps.map { it.packageName }.filter { it in defaultPinned }.toSet()
+                val initialSet = if (installedDefaults.isNotEmpty()) installedDefaults else allApps.take(6).map { it.packageName }.toSet()
                 pinnedPackages = initialSet
                 prefs.edit().putStringSet("pinned_pkgs", initialSet).apply()
             }
         }
     }
 
+    // Puxa um fundo cinematográfico aleatório da internet toda vez que volta para a home (onResume)
     LaunchedEffect(resumeTrigger) {
         withContext(Dispatchers.IO) {
             watchCards = loadWatchNextCards(context)
+            // Lista de URLs de fundos cinemáticos em alta definição (Unsplash Curated Cinema & Noir)
+            val cinemaWallpapers = listOf(
+                "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop", // Noir retro car
+                "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1920&auto=format&fit=crop", // Cinema projector
+                "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop", // Cinematic dark portrait
+                "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1920&auto=format&fit=crop", // Movie theater
+                "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=1920&auto=format&fit=crop"  // Dramatic lighting
+            )
+            randomCinematicBg = cinemaWallpapers.random()
         }
     }
 
@@ -187,7 +192,8 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        DynamicHeroBackground(headerState = headerState)
+        // Fundo dinâmico da internet ou cartão selecionado
+        DynamicHeroBackground(headerState = headerState, fallbackUrl = randomCinematicBg)
 
         Column(
             modifier = Modifier
@@ -201,6 +207,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                     .height(if (isGrid) 110.dp else 290.dp)
                     .padding(top = 22.dp)
             ) {
+                // Título minimalista estilo "Sugar" no canto superior esquerdo
                 HeroTitleBanner(
                     headerState = headerState,
                     modifier = Modifier
@@ -208,7 +215,8 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         .fillMaxWidth(0.70f)
                 )
 
-                TopRightClockPill(
+                // Relógio + Perfil igualzinho à referência da imagem
+                TopRightProfileClock(
                     modifier = Modifier.align(Alignment.TopEnd),
                     onOpenSettings = {
                         runCatching {
@@ -241,16 +249,16 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 }
             }
 
-            // 2. DOCK TRANSLÚCIDA COM MARGEM PARA O ZOOM NÃO CORTAR OS CANTOS
+            // DOCK TRANSLÚCIDA COM BLUR (Exatamente igual à referência)
             val dockShape = remember { RoundedCornerShape(28.dp) }
             val dockBrush = remember {
                 Brush.verticalGradient(
-                    colors = listOf(Color(0x99383134), Color(0xAA1C181A))
+                    colors = listOf(Color(0x773A3538), Color(0x991E1A1C))
                 )
             }
             val dockBorderBrush = remember {
                 Brush.verticalGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.34f), Color.White.copy(alpha = 0.08f))
+                    colors = listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0.1f))
                 )
             }
 
@@ -265,9 +273,10 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         .wrapContentWidth()
                         .background(dockBrush, dockShape)
                         .border(1.dp, dockBorderBrush, dockShape)
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
                 ) {
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 28.dp, vertical = 18.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(18.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -284,7 +293,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                 modifier = if (index == 0) Modifier.focusRequester(firstDockFocus) else Modifier,
                                 onFocus = {
                                     headerState.activeZone = "DOCK"
-                                    headerState.title = app.label
+                                    headerState.title = "Sugar" // Mantém o branding elegante ao focar na dock
                                     headerState.subtitle = ""
                                     headerState.artUri = null
                                 },
@@ -298,7 +307,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 3. EMBAIXO: GRELHA DE APPS RESTANTES
+            // GRELHA INFERIOR (Mostrando os apps restantes com borda visível)
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -333,35 +342,30 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
 }
 
 @Composable
-fun DynamicHeroBackground(headerState: FocusHeaderState) {
+fun DynamicHeroBackground(headerState: FocusHeaderState, fallbackUrl: String) {
     val context = LocalContext.current
-    val palette = remember(headerState.title) { Aurora.forKey(headerState.title) }
-    val bgBrush = remember(palette) {
-        Brush.verticalGradient(
-            colors = listOf(palette.primary, palette.secondary, Color(0xFF09090D))
-        )
-    }
+    val activeUri = headerState.artUri.takeIf { !it.isNullOrEmpty() } ?: fallbackUrl
+
     val vignetteBrush = remember {
         Brush.verticalGradient(
-            0.0f to Color.Black.copy(alpha = 0.3f),
-            0.55f to Color.Transparent,
-            0.82f to Color(0xCC0D0D12),
-            1.0f to Color(0xF509090D)
+            0.0f to Color.Black.copy(alpha = 0.2f),
+            0.5f to Color.Transparent,
+            0.78f to Color(0xCC0D0D12),
+            1.0f to Color(0xFF070709)
         )
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(bgBrush)
+            .background(Color(0xFF09090D))
     ) {
-        val uri = headerState.artUri
-        if (!uri.isNullOrEmpty()) {
-            val req = remember(uri) {
+        if (activeUri.isNotBlank()) {
+            val req = remember(activeUri) {
                 ImageRequest.Builder(context)
-                    .data(uri)
-                    .size(640, 360)
-                    .crossfade(false)
+                    .data(activeUri)
+                    .size(1280, 720)
+                    .crossfade(300)
                     .build()
             }
             AsyncImage(
@@ -385,20 +389,21 @@ fun HeroTitleBanner(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
+        // Título estilizado cursivo/elegante igual à referência "Sugar"
         Text(
-            text = headerState.title.uppercase(Locale.getDefault()),
+            text = if (headerState.activeZone == "GRID" || headerState.activeZone == "TOP") headerState.title.uppercase(Locale.getDefault()) else "Sugar",
             color = Color.White,
-            fontSize = if (headerState.activeZone == "GRID") 24.sp else 34.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 1.1.sp,
+            fontSize = if (headerState.activeZone == "GRID") 24.sp else 46.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        if (headerState.subtitle.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
+        if (headerState.subtitle.isNotEmpty() && headerState.activeZone != "DOCK") {
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = headerState.subtitle,
-                color = Color.White.copy(alpha = 0.75f),
+                color = Color.White.copy(alpha = 0.8f),
                 fontSize = 13.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -408,7 +413,7 @@ fun HeroTitleBanner(
 }
 
 @Composable
-fun TopRightClockPill(
+fun TopRightProfileClock(
     modifier: Modifier = Modifier,
     onOpenSettings: () -> Unit
 ) {
@@ -426,15 +431,15 @@ fun TopRightClockPill(
     Row(
         modifier = modifier
             .clip(CircleShape)
-            .background(Color(0x66000000))
+            .background(Color(0x55000000))
             .border(
                 width = 1.dp,
-                color = if (gearFocused) Color.White else Color.White.copy(alpha = 0.22f),
+                color = if (gearFocused) Color.White else Color.White.copy(alpha = 0.25f),
                 shape = CircleShape
             )
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .padding(horizontal = 14.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
             text = timeText,
@@ -442,18 +447,18 @@ fun TopRightClockPill(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
         )
+        // Ícone de avatar/engrenagem igual ao canto superior direito da referência
         Box(
             modifier = Modifier
-                .size(22.dp)
+                .size(24.dp)
                 .clip(CircleShape)
-                .background(if (gearFocused) Color.White else Color.White.copy(alpha = 0.18f))
+                .background(if (gearFocused) Color.White else Color(0xFFFF8C00))
                 .onFocusChanged { gearFocused = it.isFocused }
                 .clickable { onOpenSettings() },
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "⚙",
-                color = if (gearFocused) Color.Black else Color.White,
+                text = "👤",
                 fontSize = 12.sp
             )
         }
@@ -485,9 +490,7 @@ fun TvOsAppTile(
 
     Box(
         modifier = modifier
-            .zIndex(if (isFocused) 10f else 1f)
             .size(width, height)
-            // Aplica o recorte redondo e a escala diretamente na GPU
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -569,7 +572,6 @@ fun WatchNextCardItem(
 
     Box(
         modifier = Modifier
-            .zIndex(if (isFocused) 10f else 1f)
             .size(width = 180.dp, height = 100.dp)
             .graphicsLayer {
                 scaleX = scale
@@ -628,7 +630,6 @@ fun WatchNextCardItem(
 fun drawableToBannerBitmap(drawable: Drawable?, targetW: Int, targetH: Int): ImageBitmap? {
     if (drawable == null) return null
     return runCatching {
-        // Renderiza na proporção exata 16:9 sem cortar a lateral direita do banner
         val bmp = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         drawable.setBounds(0, 0, targetW, targetH)
