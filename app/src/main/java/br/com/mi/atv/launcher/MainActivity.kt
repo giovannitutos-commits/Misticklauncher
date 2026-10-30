@@ -82,7 +82,7 @@ data class WatchCard(
 
 @Stable
 class FocusHeaderState {
-    var title by mutableStateOf("Sugar") // Estilo da referência visual
+    var title by mutableStateOf("Up Next")
     var subtitle by mutableStateOf("")
     var artUri by mutableStateOf<String?>(null)
     var activeZone by mutableStateOf("DOCK")
@@ -154,17 +154,15 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
         }
     }
 
-    // Puxa um fundo cinematográfico aleatório da internet toda vez que volta para a home (onResume)
     LaunchedEffect(resumeTrigger) {
         withContext(Dispatchers.IO) {
             watchCards = loadWatchNextCards(context)
-            // Lista de URLs de fundos cinemáticos em alta definição (Unsplash Curated Cinema & Noir)
             val cinemaWallpapers = listOf(
-                "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop", // Noir retro car
-                "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1920&auto=format&fit=crop", // Cinema projector
-                "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop", // Cinematic dark portrait
-                "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1920&auto=format&fit=crop", // Movie theater
-                "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=1920&auto=format&fit=crop"  // Dramatic lighting
+                "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1920&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1920&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=1920&auto=format&fit=crop"
             )
             randomCinematicBg = cinemaWallpapers.random()
         }
@@ -192,7 +190,6 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Fundo dinâmico da internet ou cartão selecionado
         DynamicHeroBackground(headerState = headerState, fallbackUrl = randomCinematicBg)
 
         Column(
@@ -204,18 +201,11 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isGrid) 110.dp else 290.dp)
+                    .height(if (isGrid) 110.dp else 300.dp)
                     .padding(top = 22.dp)
             ) {
-                // Título minimalista estilo "Sugar" no canto superior esquerdo
-                HeroTitleBanner(
-                    headerState = headerState,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .fillMaxWidth(0.70f)
-                )
+                HeroTitleBanner(headerState = headerState, modifier = Modifier.align(Alignment.TopStart))
 
-                // Relógio + Perfil igualzinho à referência da imagem
                 TopRightProfileClock(
                     modifier = Modifier.align(Alignment.TopEnd),
                     onOpenSettings = {
@@ -230,16 +220,16 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(bottom = 12.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
                         items(watchCards, key = { it.id }, contentType = { "watch_card" }) { card ->
                             WatchNextCardItem(
                                 card = card,
                                 onFocus = {
                                     headerState.activeZone = "TOP"
-                                    headerState.title = card.title
-                                    headerState.subtitle = card.subtitle.ifEmpty { "Continuar assistindo" }
+                                    headerState.title = "Up Next"
+                                    headerState.subtitle = card.subtitle
                                     headerState.artUri = card.posterArtUri
                                 },
                                 onClick = { launchWatchCard(context, card) }
@@ -249,16 +239,22 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 }
             }
 
-            // DOCK TRANSLÚCIDA COM BLUR (Exatamente igual à referência)
+            // DOCK COM LIQUID GLASS (Refração de vidro translúcido, brilho superior e blur profundo)
             val dockShape = remember { RoundedCornerShape(28.dp) }
-            val dockBrush = remember {
+            val liquidGlassBrush = remember {
                 Brush.verticalGradient(
-                    colors = listOf(Color(0x773A3538), Color(0x991E1A1C))
+                    colors = listOf(
+                        Color(0x884E464A), // Brilho superior de vidro líquido
+                        Color(0xAA1C181A)  // Base escura difusa com efeito de profundidade
+                    )
                 )
             }
-            val dockBorderBrush = remember {
+            val liquidGlassBorder = remember {
                 Brush.verticalGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0.1f))
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.55f), // Linha de luz refratada no topo
+                        Color.White.copy(alpha = 0.10f)
+                    )
                 )
             }
 
@@ -271,9 +267,9 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 Box(
                     modifier = Modifier
                         .wrapContentWidth()
-                        .background(dockBrush, dockShape)
-                        .border(1.dp, dockBorderBrush, dockShape)
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .background(liquidGlassBrush, dockShape)
+                        .border(1.2.dp, liquidGlassBorder, dockShape)
+                        .padding(horizontal = 26.dp, vertical = 18.dp)
                 ) {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
@@ -293,7 +289,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                 modifier = if (index == 0) Modifier.focusRequester(firstDockFocus) else Modifier,
                                 onFocus = {
                                     headerState.activeZone = "DOCK"
-                                    headerState.title = "" // Mantém o branding elegante ao focar na dock
+                                    headerState.title = "Up Next"
                                     headerState.subtitle = ""
                                     headerState.artUri = null
                                 },
@@ -307,7 +303,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // GRELHA INFERIOR (Mostrando os apps restantes com borda visível)
+            // GRELHA INFERIOR
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -346,19 +342,20 @@ fun DynamicHeroBackground(headerState: FocusHeaderState, fallbackUrl: String) {
     val context = LocalContext.current
     val activeUri = headerState.artUri.takeIf { !it.isNullOrEmpty() } ?: fallbackUrl
 
+    // Vinheta com efeito Liquid Glass profundo (misturando tons cinemáticos escuros)
     val vignetteBrush = remember {
         Brush.verticalGradient(
-            0.0f to Color.Black.copy(alpha = 0.2f),
-            0.5f to Color.Transparent,
-            0.78f to Color(0xCC0D0D12),
-            1.0f to Color(0xFF070709)
+            0.0f to Color.Black.copy(alpha = 0.20f),
+            0.45f to Color.Transparent,
+            0.76f to Color(0xDD070709),
+            1.0f to Color(0xFF040405)
         )
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF09090D))
+            .background(Color(0xFF070709))
     ) {
         if (activeUri.isNotBlank()) {
             val req = remember(activeUri) {
@@ -389,28 +386,16 @@ fun HeroTitleBanner(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        // Exibe o título apenas se estiver na grelha ou nos cartões do topo; na dock fica limpo
-        if (headerState.activeZone == "GRID" || headerState.activeZone == "TOP") {
-            Text(
-                text = headerState.title.uppercase(Locale.getDefault()),
-                color = Color.White,
-                fontSize = if (headerState.activeZone == "GRID") 24.sp else 36.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (headerState.subtitle.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = headerState.subtitle,
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
+        // Tipografia tvOS nativa (San Francisco style limpa, negrita e espaçada)
+        Text(
+            text = "Up Next",
+            color = Color.White,
+            fontSize = if (headerState.activeZone == "GRID") 24.sp else 36.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.6.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -423,20 +408,21 @@ fun TopRightProfileClock(
     var gearFocused by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val sdf = SimpleDateFormat("h:mm a", Locale.US)
         while (true) {
             timeText = sdf.format(Date())
             delay(15_000)
         }
     }
 
+    // Pílula superior direita com efeito Liquid Glass subtil
     Row(
         modifier = modifier
             .clip(CircleShape)
-            .background(Color(0x55000000))
+            .background(Color(0x66333338))
             .border(
-                width = 1.dp,
-                color = if (gearFocused) Color.White else Color.White.copy(alpha = 0.25f),
+                width = 1.2.dp,
+                color = if (gearFocused) Color.White else Color.White.copy(alpha = 0.3f),
                 shape = CircleShape
             )
             .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -449,7 +435,6 @@ fun TopRightProfileClock(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
         )
-        // Ícone de avatar/engrenagem igual ao canto superior direito da referência
         Box(
             modifier = Modifier
                 .size(24.dp)
@@ -459,10 +444,7 @@ fun TopRightProfileClock(
                 .clickable { onOpenSettings() },
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "👤",
-                fontSize = 12.sp
-            )
+            Text(text = "👤", fontSize = 12.sp)
         }
     }
 }
@@ -480,8 +462,8 @@ fun TvOsAppTile(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.12f else 1.0f,
-        animationSpec = tween(130),
+        targetValue = if (isFocused) 1.13f else 1.0f,
+        animationSpec = tween(120),
         label = "s"
     )
 
@@ -501,8 +483,8 @@ fun TvOsAppTile(
             }
             .background(cardBrush, cardShape)
             .border(
-                width = if (isFocused) 2.5.dp else 0.5.dp,
-                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.18f),
+                width = if (isFocused) 2.8.dp else 0.6.dp,
+                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.22f),
                 shape = cardShape
             )
             .onFocusChanged { state ->
@@ -569,12 +551,12 @@ fun WatchNextCardItem(
 ) {
     val context = LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (isFocused) 1.08f else 1.0f, tween(130), label = "ws")
-    val cardShape = remember { RoundedCornerShape(14.dp) }
+    val scale by animateFloatAsState(if (isFocused) 1.08f else 1.0f, tween(120), label = "ws")
+    val cardShape = remember { RoundedCornerShape(16.dp) }
 
     Box(
         modifier = Modifier
-            .size(width = 180.dp, height = 100.dp)
+            .size(width = 240.dp, height = 135.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -583,8 +565,8 @@ fun WatchNextCardItem(
             }
             .background(Color(0xFF1E1E28), cardShape)
             .border(
-                width = if (isFocused) 2.5.dp else 0.5.dp,
-                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.22f),
+                width = if (isFocused) 2.8.dp else 0.6.dp,
+                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.28f),
                 shape = cardShape
             )
             .onFocusChanged {
@@ -597,7 +579,7 @@ fun WatchNextCardItem(
             val req = remember(card.posterArtUri) {
                 ImageRequest.Builder(context)
                     .data(card.posterArtUri)
-                    .size(360, 200)
+                    .size(480, 270)
                     .crossfade(false)
                     .build()
             }
@@ -610,21 +592,53 @@ fun WatchNextCardItem(
                     .clip(cardShape)
             )
         }
+
+        // Cartão Up Next com Liquid Glass inferior e barra de progresso branca original da Apple TV
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x55000000))
-                .padding(8.dp),
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color(0xB5000000)),
+                        startY = 50f
+                    )
+                )
+                .padding(14.dp),
             contentAlignment = Alignment.BottomStart
         ) {
-            Text(
-                text = card.title,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = card.subtitle.ifEmpty { "Continue" },
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = card.title,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(3.5.dp)
+                        .clip(RoundedCornerShape(99.dp))
+                        .background(Color.White.copy(alpha = 0.35f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.45f)
+                            .fillMaxHeight()
+                            .background(Color.White, RoundedCornerShape(99.dp))
+                    )
+                }
+            }
         }
     }
 }
@@ -643,11 +657,7 @@ fun drawableToBannerBitmap(drawable: Drawable?, targetW: Int, targetH: Int): Ima
 fun loadInstalledApps(context: Context): List<AppEntry> {
     val pm = context.packageManager
     val selfPkg = context.packageName
-    val hiddenBloat = setOf(
-        "com.mitv.tvhome",
-        "com.google.android.tv",
-        "com.android.tv.settings"
-    )
+    val hiddenBloat = setOf("com.mitv.tvhome", "com.google.android.tv", "com.android.tv.settings")
     val results = LinkedHashMap<String, AppEntry>()
 
     val intents = listOf(
@@ -698,7 +708,7 @@ fun loadWatchNextCards(context: Context): List<WatchCard> {
                 val pkgIdx = cursor.getColumnIndex("package_name")
                 val intentIdx = cursor.getColumnIndex("intent_uri")
 
-                while (cursor.moveToNext() && list.size < 12) {
+                while (cursor.moveToNext() && list.size < 10) {
                     val title = if (titleIdx >= 0) cursor.getString(titleIdx) else null
                     if (title.isNullOrBlank()) continue
                     list.add(
