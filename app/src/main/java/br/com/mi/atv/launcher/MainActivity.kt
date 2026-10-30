@@ -43,6 +43,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -156,24 +159,17 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
         }
     }
 
-    // Puxa fundos Full HD dinâmicos ilimitados da internet a cada regresso à home (com seed aleatório por timestamp)
     LaunchedEffect(resumeTrigger) {
         withContext(Dispatchers.IO) {
             watchCards = loadWatchNextCards(context)
-            val seed = System.currentTimeMillis() % 1000
             val dynamicCinemaPool = listOf(
-                "https://picsum.photos/seed/cinema$seed/1920/1080",
-                "https://picsum.photos/seed/movie$seed/1920/1080",
-                "https://picsum.photos/seed/noir$seed/1920/1080",
-                "https://picsum.photos/seed/darkfilm$seed/1920/1080",
-                "https://picsum.photos/seed/series$seed/1920/1080",
+                "https://picsum.photos/seed/cinema/1920/1080",
+                "https://picsum.photos/seed/movie/1920/1080",
+                "https://picsum.photos/seed/noir/1920/1080",
+                "https://picsum.photos/seed/darkfilm/1920/1080",
                 "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop",
                 "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1920&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1920&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=1920&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?q=80&w=1920&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=1920&auto=format&fit=crop"
+                "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop"
             )
             randomCinematicBg = dynamicCinemaPool.random()
         }
@@ -320,7 +316,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                     headerState.artUri = null
                                 },
                                 onClick = { launchApp(context, app.packageName) },
-                                onLongClick = { togglePin(app.packageName) }
+                                onAction = { togglePin(app.packageName) }
                             )
                         }
                     }
@@ -350,11 +346,11 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         onFocus = {
                             headerState.activeZone = "GRID"
                             headerState.title = app.label
-                            headerState.subtitle = "Segure OK para fixar na Dock"
+                            headerState.subtitle = "Pressione para cima no comando para fixar na Dock"
                             headerState.artUri = null
                         },
                         onClick = { launchApp(context, app.packageName) },
-                        onLongClick = { togglePin(app.packageName) }
+                        onAction = { togglePin(app.packageName) }
                     )
                 }
             }
@@ -470,7 +466,7 @@ fun TopRightProfileClock(
             if (userPhotoUrl.isNotEmpty()) {
                 AsyncImage(
                     model = userPhotoUrl,
-                    contentDescription = "Foto de Perfil",
+                    contentDescription = "Perfil",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().clip(CircleShape)
                 )
@@ -490,7 +486,7 @@ fun TvOsAppTile(
     modifier: Modifier = Modifier,
     onFocus: () -> Unit,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onAction: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -523,9 +519,18 @@ fun TvOsAppTile(
                 isFocused = state.isFocused
                 if (state.isFocused) onFocus()
             }
+            .onKeyEvent { event ->
+                // Se pressionar o botão Direcional para Cima no comando, fixa ou desfixa o app da Dock instantaneamente!
+                if (isFocused && event.key == Key.DirectionUp) {
+                    onAction()
+                    true
+                } else {
+                    false
+                }
+            }
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongClick
+                onLongClick = onAction
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -762,7 +767,7 @@ fun loadWatchNextCards(context: Context): List<WatchCard> {
     return list
 }
 
-fun launchApp(context: Context, packageName: String) {
+fn launchApp(context: Context, packageName: String) {
     val pm = context.packageManager
     val intent = pm.getLeanbackLaunchIntentForPackage(packageName)
         ?: pm.getLaunchIntentForPackage(packageName)
@@ -772,7 +777,7 @@ fun launchApp(context: Context, packageName: String) {
     }
 }
 
-fun launchWatchCard(context: Context, card: WatchCard) {
+fn launchWatchCard(context: Context, card: WatchCard) {
     if (!card.intentUri.isNullOrBlank()) {
         val parsed = runCatching { Intent.parseUri(card.intentUri, Intent.URI_INTENT_SCHEME) }.getOrNull()
         if (parsed != null) {
