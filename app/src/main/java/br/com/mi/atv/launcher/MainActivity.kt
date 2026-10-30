@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -201,6 +202,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicHeroBackground(headerState = headerState, fallbackUrl = randomCinematicBg)
 
+        // Conteúdo principal (fica inativo se o modal estiver aberto)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -238,7 +240,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                     headerState.subtitle = card.subtitle
                                     headerState.artUri = card.posterArtUri
                                 },
-                                onClick = { launchWatchCard(context, card) }
+                                onClick = { if (!showSettingsModal) launchWatchCard(context, card) }
                             )
                         }
                     }
@@ -349,20 +351,23 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         },
                         onClick = { if (!showSettingsModal) launchApp(context, app.packageName) },
                         onLongClick = {
-                            val newList = pinnedList + app.packageName
-                            savePinned(newList)
+                            if (!showSettingsModal) {
+                                val newList = pinnedList + app.packageName
+                                savePinned(newList)
+                            }
                         }
                     )
                 }
             }
         }
 
-        // Modal de Personalização da Dock com destaque visual claro para seleções (Estilo tvOS Settings)
+        // Modal de Definições com Bloqueio Total de Foco na Tela de Trás
         if (showSettingsModal) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xE60A0A0E))
+                    .pointerInput(Unit) {} // Bloqueia cliques que passem para trás
                     .padding(40.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -584,7 +589,6 @@ fun TopRightProfileClock(
         }
     }
 
-    // Pílula superior direita com relógio e botão de definições estilo tvOS (Engrenagem refratada)
     Row(
         modifier = modifier
             .clip(CircleShape)
@@ -604,7 +608,6 @@ fun TopRightProfileClock(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
         )
-        // Ícone de engrenagem idêntico ao estilo tvOS Settings
         Box(
             modifier = Modifier
                 .size(28.dp)
