@@ -1,6 +1,5 @@
 package br.com.mi.atv.launcher
 
-import android.accounts.AccountManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -43,9 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -347,7 +343,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         onFocus = {
                             headerState.activeZone = "GRID"
                             headerState.title = app.label
-                            headerState.subtitle = "Pressione para cima para fixar na Dock"
+                            headerState.subtitle = "Pressione OK para abrir • Clique longo para fixar na Dock"
                             headerState.artUri = null
                         },
                         onClick = { launchApp(context, app.packageName) },
@@ -519,14 +515,6 @@ fun TvOsAppTile(
             .onFocusChanged { state ->
                 isFocused = state.isFocused
                 if (state.isFocused) onFocus()
-            }
-            .onKeyEvent { event ->
-                if (isFocused && event.key == Key.DirectionUp) {
-                    onAction()
-                    true
-                } else {
-                    false
-                }
             }
             .combinedClickable(
                 onClick = onClick,
