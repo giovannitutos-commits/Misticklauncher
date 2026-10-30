@@ -162,11 +162,12 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
     LaunchedEffect(resumeTrigger) {
         withContext(Dispatchers.IO) {
             watchCards = loadWatchNextCards(context)
+            val seed = System.currentTimeMillis() % 1000
             val dynamicCinemaPool = listOf(
-                "https://picsum.photos/seed/cinema/1920/1080",
-                "https://picsum.photos/seed/movie/1920/1080",
-                "https://picsum.photos/seed/noir/1920/1080",
-                "https://picsum.photos/seed/darkfilm/1920/1080",
+                "https://picsum.photos/seed/cinema$seed/1920/1080",
+                "https://picsum.photos/seed/movie$seed/1920/1080",
+                "https://picsum.photos/seed/noir$seed/1920/1080",
+                "https://picsum.photos/seed/darkfilm$seed/1920/1080",
                 "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop",
                 "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1920&auto=format&fit=crop",
                 "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop"
@@ -346,7 +347,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         onFocus = {
                             headerState.activeZone = "GRID"
                             headerState.title = app.label
-                            headerState.subtitle = "Pressione para cima no comando para fixar na Dock"
+                            headerState.subtitle = "Pressione para cima para fixar na Dock"
                             headerState.artUri = null
                         },
                         onClick = { launchApp(context, app.packageName) },
@@ -520,7 +521,6 @@ fun TvOsAppTile(
                 if (state.isFocused) onFocus()
             }
             .onKeyEvent { event ->
-                // Se pressionar o botão Direcional para Cima no comando, fixa ou desfixa o app da Dock instantaneamente!
                 if (isFocused && event.key == Key.DirectionUp) {
                     onAction()
                     true
@@ -767,7 +767,7 @@ fun loadWatchNextCards(context: Context): List<WatchCard> {
     return list
 }
 
-fn launchApp(context: Context, packageName: String) {
+fun launchApp(context: Context, packageName: String) {
     val pm = context.packageManager
     val intent = pm.getLeanbackLaunchIntentForPackage(packageName)
         ?: pm.getLaunchIntentForPackage(packageName)
@@ -777,7 +777,7 @@ fn launchApp(context: Context, packageName: String) {
     }
 }
 
-fn launchWatchCard(context: Context, card: WatchCard) {
+fun launchWatchCard(context: Context, card: WatchCard) {
     if (!card.intentUri.isNullOrBlank()) {
         val parsed = runCatching { Intent.parseUri(card.intentUri, Intent.URI_INTENT_SCHEME) }.getOrNull()
         if (parsed != null) {
