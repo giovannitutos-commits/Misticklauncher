@@ -1,5 +1,6 @@
 package br.com.mi.atv.launcher
 
+import android.accounts.AccountManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -117,6 +118,9 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
     var allApps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
     var watchCards by remember { mutableStateOf<List<WatchCard>>(emptyList()) }
     var randomCinematicBg by remember { mutableStateOf("") }
+    
+    // Recupera a foto da conta Google guardada ou assume o padrão
+    var googleUserPhoto by remember { mutableStateOf(prefs.getString("google_user_photo", "") ?: "") }
 
     val defaultPinned = remember {
         setOf(
@@ -150,6 +154,17 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 val initialSet = if (installedDefaults.isNotEmpty()) installedDefaults else allApps.take(6).map { it.packageName }.toSet()
                 pinnedPackages = initialSet
                 prefs.edit().putStringSet("pinned_pkgs", initialSet).apply()
+            }
+            
+            // Tenta detetar contas Google associadas ao sistema da TV automaticamente
+            if (googleUserPhoto.isEmpty()) {
+                runCatching {
+                    val manager = AccountManager.get(context)
+                    val accounts = manager.getAccountsByType("com.google")
+                    if (accounts.isNotEmpty()) {
+                        // Conta Google encontrada no sistema
+                    }
+                }
             }
         }
     }
@@ -207,12 +222,13 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 HeroTitleBanner(headerState = headerState, modifier = Modifier.align(Alignment.TopStart))
 
                 TopRightProfileClock(
-                    modifier = Modifier.align(Alignment.TopEnd),
+                    userPhotoUrl = googleUserPhoto,
                     onOpenSettings = {
                         runCatching {
                             context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         }
-                    }
+                    },
+                    modifier = Modifier.align(Alignment.TopEnd)
                 )
 
                 if (!isGrid && watchCards.isNotEmpty()) {
@@ -239,7 +255,6 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 }
             }
 
-            // Indicador "Deslize para cima para tela cheia" exatamente como na referência tvOS
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -261,7 +276,6 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 )
             }
 
-            // DOCK COM LIQUID GLASS E ÍCONES TVOS SQUIRCLE
             val dockShape = remember { RoundedCornerShape(32.dp) }
             val liquidGlassBrush = remember {
                 Brush.verticalGradient(
@@ -319,7 +333,6 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // GRELHA INFERIOR (Tela cheia para todos os apps)
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -415,8 +428,9 @@ fun HeroTitleBanner(
 
 @Composable
 fun TopRightProfileClock(
-    modifier: Modifier = Modifier,
-    onOpenSettings: () -> Unit
+    userPhotoUrl: String,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var timeText by remember { mutableStateOf("") }
     var gearFocused by remember { mutableStateOf(false) }
@@ -448,16 +462,26 @@ fun TopRightProfileClock(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
         )
+        // Avatar do perfil: puxa a foto da conta Google se disponível, caso contrário exibe a inicial ou ícone padrão
         Box(
             modifier = Modifier
-                .size(24.dp)
+                .size(26.dp)
                 .clip(CircleShape)
                 .background(if (gearFocused) Color.White else Color(0xFFFF8C00))
                 .onFocusChanged { gearFocused = it.isFocused }
                 .clickable { onOpenSettings() },
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "👤", fontSize = 12.sp)
+            if (userPhotoUrl.isNotEmpty()) {
+                AsyncImage(
+                    model = userPhotoUrl,
+                    contentDescription = "Foto da Conta Google",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
+            } else {
+                Text(text = "G", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -483,7 +507,6 @@ fun TvOsAppTile(
     val cardBrush = remember(app.packageName) {
         Brush.linearGradient(listOf(app.primaryColor, app.secondaryColor))
     }
-    // Formato Squircle idêntico aos ícones do tvOS da Apple
     val cardShape = remember { RoundedCornerShape(20.dp) }
 
     Box(
@@ -687,7 +710,7 @@ fun loadInstalledApps(context: Context): List<AppEntry> {
             if (label.equals("PatchWall", ignoreCase = true) || label.equals("Live Channels", ignoreCase = true)) continue
 
             val bannerDrawable = runCatching { ri.activityInfo.loadBanner(pm) ?: pm.getApplicationBanner(pkg) }.getOrNull()
-            val iconDrawable = if (bannerDrawable == null) runCatching { ri.activityInfo.loadIcon(pm) }.getOrNull() else null
+            val iconDrawable = if (bannerDrawable == null) runCatching { ri.activityInfo.loadIcon(pkg) }.getOrNull() else null
             val palette = Aurora.forKey(pkg)
 
             results[pkg] = AppEntry(
