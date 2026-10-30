@@ -118,8 +118,6 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
     var allApps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
     var watchCards by remember { mutableStateOf<List<WatchCard>>(emptyList()) }
     var randomCinematicBg by remember { mutableStateOf("") }
-    
-    // Recupera a foto da conta Google guardada ou assume o padrão
     var googleUserPhoto by remember { mutableStateOf(prefs.getString("google_user_photo", "") ?: "") }
 
     val defaultPinned = remember {
@@ -155,31 +153,29 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 pinnedPackages = initialSet
                 prefs.edit().putStringSet("pinned_pkgs", initialSet).apply()
             }
-            
-            // Tenta detetar contas Google associadas ao sistema da TV automaticamente
-            if (googleUserPhoto.isEmpty()) {
-                runCatching {
-                    val manager = AccountManager.get(context)
-                    val accounts = manager.getAccountsByType("com.google")
-                    if (accounts.isNotEmpty()) {
-                        // Conta Google encontrada no sistema
-                    }
-                }
-            }
         }
     }
 
+    // Puxa fundos Full HD dinâmicos ilimitados da internet a cada regresso à home (com seed aleatório por timestamp)
     LaunchedEffect(resumeTrigger) {
         withContext(Dispatchers.IO) {
             watchCards = loadWatchNextCards(context)
-            val cinemaWallpapers = listOf(
+            val seed = System.currentTimeMillis() % 1000
+            val dynamicCinemaPool = listOf(
+                "https://picsum.photos/seed/cinema$seed/1920/1080",
+                "https://picsum.photos/seed/movie$seed/1920/1080",
+                "https://picsum.photos/seed/noir$seed/1920/1080",
+                "https://picsum.photos/seed/darkfilm$seed/1920/1080",
+                "https://picsum.photos/seed/series$seed/1920/1080",
                 "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop",
                 "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1920&auto=format&fit=crop",
                 "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop",
                 "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1920&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=1920&auto=format&fit=crop"
+                "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=1920&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?q=80&w=1920&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=1920&auto=format&fit=crop"
             )
-            randomCinematicBg = cinemaWallpapers.random()
+            randomCinematicBg = dynamicCinemaPool.random()
         }
     }
 
@@ -462,7 +458,6 @@ fun TopRightProfileClock(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
         )
-        // Avatar do perfil: puxa a foto da conta Google se disponível, caso contrário exibe a inicial ou ícone padrão
         Box(
             modifier = Modifier
                 .size(26.dp)
@@ -475,7 +470,7 @@ fun TopRightProfileClock(
             if (userPhotoUrl.isNotEmpty()) {
                 AsyncImage(
                     model = userPhotoUrl,
-                    contentDescription = "Foto da Conta Google",
+                    contentDescription = "Foto de Perfil",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().clip(CircleShape)
                 )
