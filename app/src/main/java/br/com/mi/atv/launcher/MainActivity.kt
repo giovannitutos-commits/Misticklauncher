@@ -710,7 +710,7 @@ fun loadInstalledApps(context: Context): List<AppEntry> {
             if (label.equals("PatchWall", ignoreCase = true) || label.equals("Live Channels", ignoreCase = true)) continue
 
             val bannerDrawable = runCatching { ri.activityInfo.loadBanner(pm) ?: pm.getApplicationBanner(pkg) }.getOrNull()
-            val iconDrawable = if (bannerDrawable == null) runCatching { ri.activityInfo.loadIcon(pkg) }.getOrNull() else null
+            val iconDrawable = if (bannerDrawable == null) runCatching { ri.activityInfo.loadIcon(pm) }.getOrNull() else null
             val palette = Aurora.forKey(pkg)
 
             results[pkg] = AppEntry(
