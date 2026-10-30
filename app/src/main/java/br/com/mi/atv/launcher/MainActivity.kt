@@ -202,7 +202,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicHeroBackground(headerState = headerState, fallbackUrl = randomCinematicBg)
 
-        // Conteúdo principal (fica inativo se o modal estiver aberto)
+        // Tela principal (completamente desativada para foco e cliques se o modal estiver aberto)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -235,10 +235,12 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                             WatchNextCardItem(
                                 card = card,
                                 onFocus = {
-                                    headerState.activeZone = "TOP"
-                                    headerState.title = "A Seguir"
-                                    headerState.subtitle = card.subtitle
-                                    headerState.artUri = card.posterArtUri
+                                    if (!showSettingsModal) {
+                                        headerState.activeZone = "TOP"
+                                        headerState.title = "A Seguir"
+                                        headerState.subtitle = card.subtitle
+                                        headerState.artUri = card.posterArtUri
+                                    }
                                 },
                                 onClick = { if (!showSettingsModal) launchWatchCard(context, card) }
                             )
@@ -308,15 +310,18 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                 app = app,
                                 width = 128.dp,
                                 height = 72.dp,
+                                enabled = !showSettingsModal,
                                 modifier = if (index == 0) Modifier.focusRequester(firstDockFocus) else Modifier,
                                 onFocus = {
-                                    headerState.activeZone = "DOCK"
-                                    headerState.title = "A Seguir"
-                                    headerState.subtitle = ""
-                                    headerState.artUri = null
+                                    if (!showSettingsModal) {
+                                        headerState.activeZone = "DOCK"
+                                        headerState.title = "A Seguir"
+                                        headerState.subtitle = ""
+                                        headerState.artUri = null
+                                    }
                                 },
                                 onClick = { if (!showSettingsModal) launchApp(context, app.packageName) },
-                                onLongClick = { showSettingsModal = true }
+                                onLongClick = { if (!showSettingsModal) showSettingsModal = true }
                             )
                         }
                     }
@@ -343,11 +348,14 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         app = app,
                         width = 124.dp,
                         height = 70.dp,
+                        enabled = !showSettingsModal,
                         onFocus = {
-                            headerState.activeZone = "GRID"
-                            headerState.title = app.label
-                            headerState.subtitle = "Clique no ícone tvOS para gerir a Dock"
-                            headerState.artUri = null
+                            if (!showSettingsModal) {
+                                headerState.activeZone = "GRID"
+                                headerState.title = app.label
+                                headerState.subtitle = "Clique no ícone tvOS para gerir a Dock"
+                                headerState.artUri = null
+                            }
                         },
                         onClick = { if (!showSettingsModal) launchApp(context, app.packageName) },
                         onLongClick = {
@@ -361,22 +369,27 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
             }
         }
 
-        // Modal de Definições com Bloqueio Total de Foco na Tela de Trás
+        // Modal de Definições com Bloqueio de Foco Rigoroso e Destaque Visual Absoluto
         if (showSettingsModal) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xE60A0A0E))
-                    .pointerInput(Unit) {} // Bloqueia cliques que passem para trás
+                    .background(Color(0xF00A0A0E))
+                    .pointerInput(Unit) {}
                     .padding(40.dp),
                 contentAlignment = Alignment.Center
             ) {
+                val modalFocusRequester = remember { FocusRequester() }
+                LaunchedEffect(Unit) {
+                    runCatching { modalFocusRequester.requestFocus() }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth(0.85f)
                         .fillMaxHeight(0.85f)
                         .background(Color(0xFF1E1E28), RoundedCornerShape(24.dp))
-                        .border(1.5.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                        .border(2.dp, Color.White, RoundedCornerShape(24.dp))
                         .padding(28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -392,7 +405,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         color = Color.White.copy(alpha = 0.7f),
                         fontSize = 13.sp
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Text(text = "Na Dock (Clique para remover):", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
                     Spacer(modifier = Modifier.height(10.dp))
@@ -409,12 +422,12 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                     modifier = Modifier
                                         .size(110.dp, 75.dp)
                                         .graphicsLayer {
-                                            scaleX = if (modalItemFocused) 1.1f else 1.0f
-                                            scaleY = if (modalItemFocused) 1.1f else 1.0f
+                                            scaleX = if (modalItemFocused) 1.12f else 1.0f
+                                            scaleY = if (modalItemFocused) 1.12f else 1.0f
                                         }
                                         .background(app.primaryColor, RoundedCornerShape(14.dp))
                                         .border(
-                                            width = if (modalItemFocused) 3.5.dp else 1.dp,
+                                            width = if (modalItemFocused) 4.dp else 1.dp,
                                             color = if (modalItemFocused) Color.White else Color.White.copy(alpha = 0.4f),
                                             shape = RoundedCornerShape(14.dp)
                                         )
@@ -440,7 +453,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                         Text(
                                             text = "✖ Remover",
                                             color = Color.Yellow,
-                                            fontSize = 9.sp,
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
@@ -449,7 +462,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(text = "Disponíveis para Adicionar:", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -465,12 +478,12 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                 modifier = Modifier
                                     .height(60.dp)
                                     .graphicsLayer {
-                                        scaleX = if (gridItemFocused) 1.05f else 1.0f
-                                        scaleY = if (gridItemFocused) 1.05f else 1.0f
+                                        scaleX = if (gridItemFocused) 1.06f else 1.0f
+                                        scaleY = if (gridItemFocused) 1.06f else 1.0f
                                     }
                                     .background(app.secondaryColor, RoundedCornerShape(12.dp))
                                     .border(
-                                        width = if (gridItemFocused) 3.dp else 1.dp,
+                                        width = if (gridItemFocused) 3.5.dp else 1.dp,
                                         color = if (gridItemFocused) Color.White else Color.White.copy(alpha = 0.3f),
                                         shape = RoundedCornerShape(12.dp)
                                     )
@@ -494,17 +507,30 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
+                    var buttonFocused by remember { mutableStateOf(false) }
                     Box(
                         modifier = Modifier
+                            .focusRequester(modalFocusRequester)
+                            .onFocusChanged { buttonFocused = it.isFocused }
+                            .graphicsLayer {
+                                scaleX = if (buttonFocused) 1.08f else 1.0f
+                                scaleY = if (buttonFocused) 1.08f else 1.0f
+                            }
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF007AFF))
+                            .background(if (buttonFocused) Color.White else Color(0xFF007AFF))
                             .clickable { showSettingsModal = false }
+                            .border(width = if (buttonFocused) 2.5.dp else 0.dp, color = Color.Black, shape = RoundedCornerShape(14.dp))
                             .padding(horizontal = 36.dp, vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "Concluído", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Concluído",
+                            color = if (buttonFocused) Color.Black else Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -632,6 +658,7 @@ fun TvOsAppTile(
     app: AppEntry,
     width: Dp,
     height: Dp,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
     onFocus: () -> Unit,
     onClick: () -> Unit,
@@ -639,7 +666,7 @@ fun TvOsAppTile(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.13f else 1.0f,
+        targetValue = if (isFocused && enabled) 1.13f else 1.0f,
         animationSpec = tween(120),
         label = "s"
     )
@@ -660,15 +687,16 @@ fun TvOsAppTile(
             }
             .background(cardBrush, cardShape)
             .border(
-                width = if (isFocused) 3.dp else 0.6.dp,
-                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.22f),
+                width = if (isFocused && enabled) 3.dp else 0.6.dp,
+                color = if (isFocused && enabled) Color.White else Color.White.copy(alpha = 0.22f),
                 shape = cardShape
             )
             .onFocusChanged { state ->
                 isFocused = state.isFocused
-                if (state.isFocused) onFocus()
+                if (state.isFocused && enabled) onFocus()
             }
             .combinedClickable(
+                enabled = enabled,
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
