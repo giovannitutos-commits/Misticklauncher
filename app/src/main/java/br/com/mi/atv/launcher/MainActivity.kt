@@ -313,7 +313,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                     headerState.subtitle = ""
                                     headerState.artUri = null
                                 },
-                                onClick = { launchApp(context, app.packageName) },
+                                onClick = { if (!showSettingsModal) launchApp(context, app.packageName) },
                                 onLongClick = { showSettingsModal = true }
                             )
                         }
@@ -344,10 +344,10 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         onFocus = {
                             headerState.activeZone = "GRID"
                             headerState.title = app.label
-                            headerState.subtitle = "Clique na foto de perfil para gerir a Dock"
+                            headerState.subtitle = "Clique no ícone tvOS para gerir a Dock"
                             headerState.artUri = null
                         },
-                        onClick = { launchApp(context, app.packageName) },
+                        onClick = { if (!showSettingsModal) launchApp(context, app.packageName) },
                         onLongClick = {
                             val newList = pinnedList + app.packageName
                             savePinned(newList)
@@ -357,12 +357,12 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
             }
         }
 
-        // Modal de Personalização da Dock ao clicar na foto de perfil
+        // Modal de Personalização da Dock com destaque visual claro para seleções (Estilo tvOS Settings)
         if (showSettingsModal) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xCC000000))
+                    .background(Color(0xE60A0A0E))
                     .padding(40.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -370,89 +370,133 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                     modifier = Modifier
                         .fillMaxWidth(0.85f)
                         .fillMaxHeight(0.85f)
-                        .background(Color(0xFF1E1E24), RoundedCornerShape(24.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
-                        .padding(24.dp),
+                        .background(Color(0xFF1E1E28), RoundedCornerShape(24.dp))
+                        .border(1.5.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                        .padding(28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Personalizar Aplicativos da Dock",
+                        text = "Ajustar Aplicativos da Dock",
                         color = Color.White,
-                        fontSize = 22.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Gerencie a ordem e os apps fixados na sua Dock",
+                        text = "Selecione um app para removê-lo da Dock ou adicione novos abaixo",
                         color = Color.White.copy(alpha = 0.7f),
                         fontSize = 13.sp
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    // Lista de Apps Atuais na Dock com botões para mover / remover
-                    Text(text = "Apps na Dock (Atuais):", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "Na Dock (Clique para remover):", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(90.dp)
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(95.dp)
                     ) {
                         items(pinnedList, key = { it }) { pkg ->
                             val app = allApps.find { it.packageName == pkg }
                             if (app != null) {
+                                var modalItemFocused by remember { mutableStateOf(false) }
                                 Box(
                                     modifier = Modifier
-                                        .size(100.dp, 70.dp)
-                                        .background(app.primaryColor, RoundedCornerShape(12.dp))
-                                        .border(1.5.dp, Color.White, RoundedCornerShape(12.dp))
+                                        .size(110.dp, 75.dp)
+                                        .graphicsLayer {
+                                            scaleX = if (modalItemFocused) 1.1f else 1.0f
+                                            scaleY = if (modalItemFocused) 1.1f else 1.0f
+                                        }
+                                        .background(app.primaryColor, RoundedCornerShape(14.dp))
+                                        .border(
+                                            width = if (modalItemFocused) 3.5.dp else 1.dp,
+                                            color = if (modalItemFocused) Color.White else Color.White.copy(alpha = 0.4f),
+                                            shape = RoundedCornerShape(14.dp)
+                                        )
+                                        .onFocusChanged { modalItemFocused = it.isFocused }
                                         .clickable {
-                                            // Remove da dock ao clicar
                                             val newList = pinnedList.toMutableList().apply { remove(pkg) }
                                             savePinned(newList)
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(text = app.label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(4.dp))
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.padding(4.dp)
+                                    ) {
+                                        Text(
+                                            text = app.label,
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "✖ Remover",
+                                            color = Color.Yellow,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = "Apps Disponíveis para Adicionar:", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(text = "Disponíveis para Adicionar:", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(4),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxWidth().weight(1f)
                     ) {
                         items(gridApps, key = { it.packageName }) { app ->
+                            var gridItemFocused by remember { mutableStateOf(false) }
                             Box(
                                 modifier = Modifier
-                                    .height(55.dp)
-                                    .background(app.secondaryColor, RoundedCornerShape(10.dp))
-                                    .border(0.8.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                    .height(60.dp)
+                                    .graphicsLayer {
+                                        scaleX = if (gridItemFocused) 1.05f else 1.0f
+                                        scaleY = if (gridItemFocused) 1.05f else 1.0f
+                                    }
+                                    .background(app.secondaryColor, RoundedCornerShape(12.dp))
+                                    .border(
+                                        width = if (gridItemFocused) 3.dp else 1.dp,
+                                        color = if (gridItemFocused) Color.White else Color.White.copy(alpha = 0.3f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .onFocusChanged { gridItemFocused = it.isFocused }
                                     .clickable {
                                         val newList = pinnedList + app.packageName
                                         savePinned(newList)
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(text = "+ " + app.label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 8.dp))
+                                Text(
+                                    text = "+ " + app.label,
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .background(Color(0xFF007AFF))
                             .clickable { showSettingsModal = false }
-                            .padding(horizontal = 32.dp, vertical = 12.dp),
+                            .padding(horizontal = 36.dp, vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(text = "Concluído", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -540,6 +584,7 @@ fun TopRightProfileClock(
         }
     }
 
+    // Pílula superior direita com relógio e botão de definições estilo tvOS (Engrenagem refratada)
     Row(
         modifier = modifier
             .clip(CircleShape)
@@ -559,25 +604,21 @@ fun TopRightProfileClock(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
         )
+        // Ícone de engrenagem idêntico ao estilo tvOS Settings
         Box(
             modifier = Modifier
-                .size(26.dp)
+                .size(28.dp)
                 .clip(CircleShape)
-                .background(if (gearFocused) Color.White else Color(0xFFFF8C00))
+                .background(if (gearFocused) Color.White else Color(0xFF2C2C2E))
+                .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
                 .onFocusChanged { gearFocused = it.isFocused }
                 .clickable { onOpenSettings() },
             contentAlignment = Alignment.Center
         ) {
-            if (userPhotoUrl.isNotEmpty()) {
-                AsyncImage(
-                    model = userPhotoUrl,
-                    contentDescription = "Definições e Perfil",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(CircleShape)
-                )
-            } else {
-                Text(text = "⚙️", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
+            Text(
+                text = "⚙️",
+                fontSize = 13.sp
+            )
         }
     }
 }
