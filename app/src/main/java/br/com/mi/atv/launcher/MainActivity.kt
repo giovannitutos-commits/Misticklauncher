@@ -293,7 +293,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                 modifier = if (index == 0) Modifier.focusRequester(firstDockFocus) else Modifier,
                                 onFocus = {
                                     headerState.activeZone = "DOCK"
-                                    headerState.title = "Sugar" // Mantém o branding elegante ao focar na dock
+                                    headerState.title = "" // Mantém o branding elegante ao focar na dock
                                     headerState.subtitle = ""
                                     headerState.artUri = null
                                 },
@@ -389,25 +389,27 @@ fun HeroTitleBanner(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        // Título estilizado cursivo/elegante igual à referência "Sugar"
-        Text(
-            text = if (headerState.activeZone == "GRID" || headerState.activeZone == "TOP") headerState.title.uppercase(Locale.getDefault()) else "Sugar",
-            color = Color.White,
-            fontSize = if (headerState.activeZone == "GRID") 24.sp else 46.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.8.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (headerState.subtitle.isNotEmpty() && headerState.activeZone != "DOCK") {
-            Spacer(modifier = Modifier.height(2.dp))
+        // Exibe o título apenas se estiver na grelha ou nos cartões do topo; na dock fica limpo
+        if (headerState.activeZone == "GRID" || headerState.activeZone == "TOP") {
             Text(
-                text = headerState.subtitle,
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 13.sp,
+                text = headerState.title.uppercase(Locale.getDefault()),
+                color = Color.White,
+                fontSize = if (headerState.activeZone == "GRID") 24.sp else 36.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (headerState.subtitle.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = headerState.subtitle,
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
