@@ -82,7 +82,7 @@ data class WatchCard(
 
 @Stable
 class FocusHeaderState {
-    var title by mutableStateOf("Up Next")
+    var title by mutableStateOf("A Seguir")
     var subtitle by mutableStateOf("")
     var artUri by mutableStateOf<String?>(null)
     var activeZone by mutableStateOf("DOCK")
@@ -201,7 +201,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isGrid) 110.dp else 300.dp)
+                    .height(if (isGrid) 110.dp else 290.dp)
                     .padding(top = 22.dp)
             ) {
                 HeroTitleBanner(headerState = headerState, modifier = Modifier.align(Alignment.TopStart))
@@ -228,7 +228,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                 card = card,
                                 onFocus = {
                                     headerState.activeZone = "TOP"
-                                    headerState.title = "Up Next"
+                                    headerState.title = "A Seguir"
                                     headerState.subtitle = card.subtitle
                                     headerState.artUri = card.posterArtUri
                                 },
@@ -239,29 +239,45 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                 }
             }
 
-            // DOCK COM LIQUID GLASS (Refração de vidro translúcido, brilho superior e blur profundo)
-            val dockShape = remember { RoundedCornerShape(28.dp) }
+            // Indicador "Deslize para cima para tela cheia" exatamente como na referência tvOS
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "︿",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Deslize para cima para tela cheia",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp
+                )
+            }
+
+            // DOCK COM LIQUID GLASS E ÍCONES TVOS SQUIRCLE
+            val dockShape = remember { RoundedCornerShape(32.dp) }
             val liquidGlassBrush = remember {
                 Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0x884E464A), // Brilho superior de vidro líquido
-                        Color(0xAA1C181A)  // Base escura difusa com efeito de profundidade
-                    )
+                    colors = listOf(Color(0x884E464A), Color(0xAA1C181A))
                 )
             }
             val liquidGlassBorder = remember {
                 Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.55f), // Linha de luz refratada no topo
-                        Color.White.copy(alpha = 0.10f)
-                    )
+                    colors = listOf(Color.White.copy(alpha = 0.55f), Color.White.copy(alpha = 0.10f))
                 )
             }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = 2.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -269,7 +285,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                         .wrapContentWidth()
                         .background(liquidGlassBrush, dockShape)
                         .border(1.2.dp, liquidGlassBorder, dockShape)
-                        .padding(horizontal = 26.dp, vertical = 18.dp)
+                        .padding(horizontal = 26.dp, vertical = 16.dp)
                 ) {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
@@ -289,7 +305,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
                                 modifier = if (index == 0) Modifier.focusRequester(firstDockFocus) else Modifier,
                                 onFocus = {
                                     headerState.activeZone = "DOCK"
-                                    headerState.title = "Up Next"
+                                    headerState.title = "A Seguir"
                                     headerState.subtitle = ""
                                     headerState.artUri = null
                                 },
@@ -303,7 +319,7 @@ fun TvOsLauncherScreen(resumeTrigger: Int) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // GRELHA INFERIOR
+            // GRELHA INFERIOR (Tela cheia para todos os apps)
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -342,7 +358,6 @@ fun DynamicHeroBackground(headerState: FocusHeaderState, fallbackUrl: String) {
     val context = LocalContext.current
     val activeUri = headerState.artUri.takeIf { !it.isNullOrEmpty() } ?: fallbackUrl
 
-    // Vinheta com efeito Liquid Glass profundo (misturando tons cinemáticos escuros)
     val vignetteBrush = remember {
         Brush.verticalGradient(
             0.0f to Color.Black.copy(alpha = 0.20f),
@@ -386,9 +401,8 @@ fun HeroTitleBanner(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        // Tipografia tvOS nativa (San Francisco style limpa, negrita e espaçada)
         Text(
-            text = "Up Next",
+            text = "A Seguir",
             color = Color.White,
             fontSize = if (headerState.activeZone == "GRID") 24.sp else 36.sp,
             fontWeight = FontWeight.Bold,
@@ -415,7 +429,6 @@ fun TopRightProfileClock(
         }
     }
 
-    // Pílula superior direita com efeito Liquid Glass subtil
     Row(
         modifier = modifier
             .clip(CircleShape)
@@ -470,7 +483,8 @@ fun TvOsAppTile(
     val cardBrush = remember(app.packageName) {
         Brush.linearGradient(listOf(app.primaryColor, app.secondaryColor))
     }
-    val cardShape = remember { RoundedCornerShape(16.dp) }
+    // Formato Squircle idêntico aos ícones do tvOS da Apple
+    val cardShape = remember { RoundedCornerShape(20.dp) }
 
     Box(
         modifier = modifier
@@ -483,7 +497,7 @@ fun TvOsAppTile(
             }
             .background(cardBrush, cardShape)
             .border(
-                width = if (isFocused) 2.8.dp else 0.6.dp,
+                width = if (isFocused) 3.dp else 0.6.dp,
                 color = if (isFocused) Color.White else Color.White.copy(alpha = 0.22f),
                 shape = cardShape
             )
@@ -517,7 +531,7 @@ fun TvOsAppTile(
                 Image(
                     bitmap = app.icon,
                     contentDescription = app.label,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(34.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
@@ -552,7 +566,7 @@ fun WatchNextCardItem(
     val context = LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (isFocused) 1.08f else 1.0f, tween(120), label = "ws")
-    val cardShape = remember { RoundedCornerShape(16.dp) }
+    val cardShape = remember { RoundedCornerShape(18.dp) }
 
     Box(
         modifier = Modifier
@@ -565,7 +579,7 @@ fun WatchNextCardItem(
             }
             .background(Color(0xFF1E1E28), cardShape)
             .border(
-                width = if (isFocused) 2.8.dp else 0.6.dp,
+                width = if (isFocused) 3.dp else 0.6.dp,
                 color = if (isFocused) Color.White else Color.White.copy(alpha = 0.28f),
                 shape = cardShape
             )
@@ -593,7 +607,6 @@ fun WatchNextCardItem(
             )
         }
 
-        // Cartão Up Next com Liquid Glass inferior e barra de progresso branca original da Apple TV
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -608,7 +621,7 @@ fun WatchNextCardItem(
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = card.subtitle.ifEmpty { "Continue" },
+                    text = card.subtitle.ifEmpty { "Continuar" },
                     color = Color.White.copy(alpha = 0.85f),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
